@@ -1,0 +1,1 @@
+{"dependencies":{"express":"^4.21.2"},"description":"Tablekeeper stage-1: concurrency-safe restaurant reservation service","engines":{"node":">=22"},"main":"server.js","name":"tablekeeper-stage-2","scripts":{"init-db":"node db.js","start":"node server.js","test":"node test/run.js"},"version":"1.0.0"}

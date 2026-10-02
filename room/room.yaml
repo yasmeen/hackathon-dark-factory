@@ -1,0 +1,38 @@
+# BAND room definition (as code — desktop app unavailable in this environment)
+# In Band Desktop this room would be created by the planner seat via the
+# band-peer plugin. This file is the declarative equivalent: seats, mandates,
+# and the run's message log lives in transcript.md.
+
+room:
+  name: "dark-factory-tablekeeper"
+  created: "2026-10-01"
+  purpose: >
+    Coordinate a band of coding-agent seats to ship a clean-room clone of a
+    restaurant reservation product. The dispatched task is the only human
+    input; everything after is agent-to-agent.
+
+seats:
+  - name: planner
+    mandate: ../seats/planner.md
+    runtime: shared
+  - name: implementer
+    mandate: ../seats/implementer.md
+    runtime: shared
+  - name: reviewer
+    mandate: ../seats/reviewer.md
+    runtime: shared
+
+protocol:
+  - planner decomposes the brief into work items with observable done-states
+  - planner dispatches items to implementer (parallel where unblocked)
+  - implementer hands off each item with changed files + verify commands
+  - reviewer verifies independently against done-states; PASS/FAIL with evidence
+  - on FAIL, reviewer posts a defect report; implementer fixes; reviewer re-verifies
+  - planner declares the run complete only when all items are verified
+
+artifacts:
+  - ../stage-1/        # minimum eligible submission: complete stage-1 service
+  - ../stage-2/        # stretch: stage-1 + admin dashboard, waitlist
+  - ../seats/          # the three mandate files
+  - ../FACTORY.md      # seat setup, design rationale, costs, recovery
+  - transcript.md      # this run's message log (the room export equivalent)

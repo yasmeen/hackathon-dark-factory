@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tablekeeper — book a table, beautifully</title>
+<style>
+  :root { --ink:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff; --accent:#c2410c; --accent-d:#9a3412; --line:#e7e5e4; --ok:#15803d; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#1c1917; color:#fafaf9; padding:28px 20px; }
+  header .wrap { max-width:960px; margin:0 auto; }
+  header h1 { font-size:28px; letter-spacing:-.02em; }
+  header h1 span { color:#fdba74; }
+  header p { color:#a8a29e; margin-top:6px; font-size:15px; }
+  .wrap { max-width:960px; margin:0 auto; padding:20px; }
+  .steps { display:flex; gap:8px; margin:18px 0 24px; flex-wrap:wrap; }
+  .step { flex:1; min-width:120px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); font-size:13px; color:var(--muted); }
+  .step.active { border-color:var(--accent); color:var(--accent-d); font-weight:600; }
+  .step.done { color:var(--ok); border-color:#bbf7d0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px; }
+  .card h2 { font-size:17px; margin-bottom:12px; }
+  .restos { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .resto { border:1px solid var(--line); border-radius:12px; padding:16px; cursor:pointer; transition:.15s; background:#fff; }
+  .resto:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .resto.sel { border:2px solid var(--accent); }
+  .resto h3 { font-size:16px; } .resto p { color:var(--muted); font-size:13px; margin-top:4px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  label { font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
+  input, select { font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--ink); }
+  .field { flex:1; min-width:140px; }
+  .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; margin-top:8px; }
+  .slot { padding:10px; text-align:center; border:1px solid var(--line); border-radius:10px; cursor:pointer; font-size:14px; background:#fff; }
+  .slot:hover:not(:disabled) { border-color:var(--accent); }
+  .slot.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .slot:disabled { opacity:.35; cursor:not-allowed; text-decoration:line-through; }
+  .btn { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:14px 22px; font-size:16px; font-weight:600; cursor:pointer; width:100%; }
+  .btn:hover { background:var(--accent-d); } .btn:disabled { opacity:.5; cursor:wait; }
+  .btn.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .confirm { text-align:center; padding:12px 0; }
+  .confirm .big { font-size:44px; } .confirm h2 { margin:8px 0; }
+  .detail { background:#f5f5f4; border-radius:10px; padding:14px; margin:14px 0; text-align:left; font-size:14px; }
+  .detail div { display:flex; justify-content:space-between; padding:4px 0; }
+  .detail span:first-child { color:var(--muted); }
+  .mine { border-bottom:1px solid var(--line); padding:12px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .mine small { color:var(--muted); display:block; margin-top:2px; }
+  .cancel { background:none; border:1px solid #fecaca; color:#b91c1c; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:12px; margin-bottom:12px; font-size:14px; display:none; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { padding:10px 18px; border-radius:999px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px; }
+  .tab.sel { background:#1c1917; color:#fff; border-color:#1c1917; }
+  .hidden { display:none; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:24px; }
+  @media (max-width:520px){ header h1{font-size:22px;} .card{padding:16px;} }
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>table<span>keeper</span></h1><p>Book a table, beautifully. Never double-booked — guaranteed.</p></div></header>
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab sel" data-tab="book">Book a table</button>
+    <button class="tab" data-tab="mine">My reservations</button>
+  </div>
+
+  <div id="tab-book">
+    <div class="steps">
+      <div class="step active" data-s="1">1 · Restaurant</div>
+      <div class="step" data-s="2">2 · Date &amp; party</div>
+      <div class="step" data-s="3">3 · Time</div>
+      <div class="step" data-s="4">4 · Details</div>
+    </div>
+    <div class="err" id="err"></div>
+
+    <div class="card" id="pane1"><h2>Choose a restaurant</h2><div class="restos" id="restos"></div></div>
+
+    <div class="card hidden" id="pane2">
+      <h2>When and how many?</h2>
+      <div class="row">
+        <div class="field"><label>Date</label><input type="date" id="date"></div>
+        <div class="field"><label>Party size</label>
+          <select id="party"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select>
+        </div>
+      </div>
+      <button class="btn" id="toSlots">See available times</button>
+    </div>
+
+    <div class="card hidden" id="pane3"><h2>Pick a time</h2><div class="slots" id="slots"></div>
+      <div style="margin-top:14px"><button class="btn ghost" id="back2">← Back</button></div>
+    </div>
+
+    <div class="card hidden" id="pane4">
+      <h2>Your details</h2>
+      <div class="row">
+        <div class="field"><label>Name</label><input id="name" placeholder="Jane Appleseed" autocomplete="name"></div>
+        <div class="field"><label>Phone</label><input id="phone" placeholder="+1 305 555 0100" autocomplete="tel"></div>
+      </div>
+      <div class="detail" id="summary"></div>
+      <button class="btn" id="book">Confirm reservation</button>
+      <div style="margin-top:10px"><button class="btn ghost" id="back3">← Back</button></div>
+    </div>
+
+    <div class="card hidden" id="pane5"><div class="confirm">
+      <div class="big">🎉</div><h2>You're booked!</h2>
+      <div class="detail" id="doneDetail"></div>
+      <button class="btn" id="again">Make another reservation</button>
+    </div></div>
+  </div>
+
+  <div id="tab-mine" class="hidden">
+    <div class="card"><h2>Find my reservations</h2>
+      <div class="row"><div class="field"><label>Phone number used at booking</label><input id="lookupPhone" placeholder="+1 305 555 0100"></div></div>
+      <button class="btn" id="lookup">Look up</button>
+      <div id="mineList" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+<footer>tablekeeper · stage-1 — a table is never double-booked, under concurrency, retries, or time zones.</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = { resto:null, date:'', party:2, slot:null, key:crypto.randomUUID() };
+const errBox = $('err');
+const showErr = m => { errBox.textContent = m; errBox.style.display = 'block'; };
+const hideErr = () => errBox.style.display = 'none';
+const step = n => document.querySelectorAll('.step').forEach(s => {
+  const k = +s.dataset.s;
+  s.classList.toggle('active', k === n);
+  s.classList.toggle('done', k < n);
+});
+const show = id => ['pane1','pane2','pane3','pane4','pane5'].forEach(p => $(p).classList.toggle('hidden', p !== id));
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('sel'));
+  t.classList.add('sel');
+  $('tab-book').classList.toggle('hidden', t.dataset.tab !== 'book');
+  $('tab-mine').classList.toggle('hidden', t.dataset.tab !== 'mine');
+}));
+
+fetch('/api/restaurants').then(r => r.json()).then(({restaurants}) => {
+  $('restos').innerHTML = restaurants.map(r =>
+    `<div class="resto" data-id="${r.id}"><h3>${r.name}</h3><p>${r.cuisine} · ${r.opens_at}–${r.closes_at} local</p></div>`).join('');
+  document.querySelectorAll('.resto').forEach(el => el.addEventListener('click', () => {
+    document.querySelectorAll('.resto').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    state.resto = restaurants.find(r => r.id === el.dataset.id);
+    show('pane2'); step(2); hideErr();
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    $('date').value = d.toISOString().slice(0, 10);
+  }));
+});
+
+$('toSlots').addEventListener('click', async () => {
+  hideErr();
+  state.date = $('date').value; state.party = +$('party').value;
+  if (!state.date) return showErr('Pick a date first.');
+  const q = new URLSearchParams({ date: state.date, party_size: state.party });
+  const res = await fetch(`/api/restaurants/${state.resto.id}/availability?${q}`);
+  const { slots, error } = await res.json();
+  if (error) return showErr(error);
+  const avail = slots.filter(s => s.available);
+  $('slots').innerHTML = slots.map(s =>
+    `<button class="slot" ${s.available ? '' : 'disabled'} data-t="${s.time}">${s.display_time}</button>`).join('')
+    || '<p style="color:var(--muted)">No availability that day.</p>';
+  document.querySelectorAll('.slot:not(:disabled)').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.slot').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel'); state.slot = b.dataset.t;
+    $('summary').innerHTML = `
+      <div><span>Restaurant</span><span>${state.resto.name}</span></div>
+      <div><span>Date</span><span>${state.date}</span></div>
+      <div><span>Time</span><span>${b.textContent}</span></div>
+      <div><span>Party</span><span>${state.party}</span></div>`;
+    show('pane4'); step(4); hideErr();
+  }));
+  show('pane3'); step(3);
+});
+$('back2').addEventListener('click', () => { show('pane2'); step(2); });
+$('back3').addEventListener('click', () => { show('pane3'); step(3); });
+
+$('book').addEventListener('click', async () => {
+  hideErr();
+  const name = $('name').value.trim(), phone = $('phone').value.trim();
+  if (!name || !phone) return showErr('Name and phone are required.');
+  const btn = $('book'); btn.disabled = true; btn.textContent = 'Booking…';
+  try {
+    const res = await fetch('/api/reservations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restaurant_id: state.resto.id, date: state.date, time: state.slot,
+        party_size: state.party, name, phone, idempotency_key: state.key }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showErr(data.error || 'Booking failed.'); return; }
+    const r = data.reservation;
+    $('doneDetail').innerHTML = `
+      <div><span>Restaurant</span><span>${r.restaurant} · Table ${r.table}</span></div>
+      <div><span>When</span><span>${r.when_local}</span></div>
+      <div><span>Party of</span><span>${r.party_size}</span></div>
+      <div><span>Booked as</span><span>${r.name}</span></div>`;
+    show('pane5'); step(4);
+  } catch { showErr('Network error — your booking may have gone through; check My reservations before retrying.'); }
+  finally { btn.disabled = false; btn.textContent = 'Confirm reservation'; state.key = crypto.randomUUID(); }
+});
+$('again').addEventListener('click', () => { show('pane1'); step(1); });
+
+$('lookup').addEventListener('click', async () => {
+  const phone = $('lookupPhone').value.trim();
+  if (!phone) return;
+  const { reservations } = await fetch('/api/reservations?phone=' + encodeURIComponent(phone)).then(r => r.json());
+  $('mineList').innerHTML = reservations.length ? reservations.map(r => `
+    <div class="mine"><div><strong>${r.restaurant}</strong> · Table ${r.tbl}<small>${r.when_local} · party of ${r.party_size}</small></div>
+    <button class="cancel" data-id="${r.id}">Cancel</button></div>`).join('')
+    : '<p style="color:var(--muted)">No upcoming reservations for that number.</p>';
+  document.querySelectorAll('.cancel').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Cancel this reservation?')) return;
+    await fetch(`/api/reservations/${b.dataset.id}?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
+    $('lookup').click();
+  }));
+});
+</script>
+</body>
+</html>
