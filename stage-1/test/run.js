@@ -8,6 +8,15 @@
 
 const { startServers, call, race, futureDate, checker } = require('./lib');
 
+// Next future occurrence of a month-day (always within the 365-day horizon),
+// so the suite keeps working as the calendar moves on.
+function next(mmdd) {
+  const y = new Date().getUTCFullYear();
+  const d = `${y}-${mmdd}`;
+  return Date.parse(d) > Date.now() + 2 * 86400000 ? d : `${y + 1}-${mmdd}`;
+}
+const dayAfter = d => new Date(Date.parse(d) + 86400000).toISOString().slice(0, 10);
+
 async function main() {
   const { bases, base, stop } = await startServers({ count: 4, env: { TK_RACE_WINDOW_MS: '40' } });
   const { check, done } = checker();
@@ -61,20 +70,21 @@ async function main() {
     mine.json.reservations.length === 2, `got ${mine.json.reservations.length}`);
 
   console.log('== time zones & DST ==');
-  const tzb = await post({ restaurant_id: 'casa-verde', date: '2027-07-15', time: '19:00', party_size: 2, ...guest });
+  const JUL = next('07-15'), JUL2 = next('07-16'), JAN = next('01-15');
+  const tzb = await post({ restaurant_id: 'casa-verde', date: JUL, time: '19:00', party_size: 2, ...guest });
   check('19:00 America/New_York in July stored as 23:00 UTC (EDT)',
-    tzb.json && tzb.json.reservation.slot_start_utc === '2027-07-15T23:00:00.000Z',
+    tzb.json && tzb.json.reservation.slot_start_utc === `${JUL}T23:00:00.000Z`,
     `got ${tzb.json && tzb.json.reservation && tzb.json.reservation.slot_start_utc}`);
-  const win = await post({ restaurant_id: 'casa-verde', date: '2027-01-15', time: '19:00', party_size: 2, ...guest });
+  const win = await post({ restaurant_id: 'casa-verde', date: JAN, time: '19:00', party_size: 2, ...guest });
   check('19:00 America/New_York in January stored as 00:00 UTC next day (EST)',
-    win.json && win.json.reservation.slot_start_utc === '2027-01-16T00:00:00.000Z',
+    win.json && win.json.reservation.slot_start_utc === `${dayAfter(JAN)}T00:00:00.000Z`,
     `got ${win.json && win.json.reservation && win.json.reservation.slot_start_utc}`);
-  const shown = await post({ restaurant_id: 'casa-verde', date: '2027-07-16', time: '19:00', party_size: 2,
+  const shown = await post({ restaurant_id: 'casa-verde', date: JUL2, time: '19:00', party_size: 2,
     tz: 'America/Los_Angeles', ...guest });
   check('client tz only changes display: NY 19:00 shown as 4:00 PM PDT',
-    shown.json && shown.json.reservation.slot_start_utc === '2027-07-16T23:00:00.000Z' &&
+    shown.json && shown.json.reservation.slot_start_utc === `${JUL2}T23:00:00.000Z` &&
     /4:00\s?PM PDT/.test(shown.json.reservation.when_local), JSON.stringify(shown.json));
-  const av = await call(base, 'GET', '/api/restaurants/copper-kettle/availability?date=2027-07-15&party_size=2&tz=America/New_York');
+  const av = await call(base, 'GET', `/api/restaurants/copper-kettle/availability?date=${JUL}&party_size=2&tz=America/New_York`);
   const noon = av.json.slots.find(s => s.time === '12:00');
   check('Chicago 12:00 viewed from New York shows 1:00 PM', noon && noon.display_time === '1:00 PM',
     `got ${noon && noon.display_time}`);
@@ -112,6 +122,9 @@ async function main() {
   check('availability for year 0999 -> 400 (not 500)', oldYear.status === 400, `got ${oldYear.status}`);
   await v('booking in year 0001 -> 400 (not 500)', { ...ok, date: '0001-01-01' }, 400);
   await v('booking more than a year ahead -> 400', { ...ok, date: futureDate(400) }, 400);
+  const farAv = await call(base, 'GET', `/api/restaurants/casa-verde/availability?date=${futureDate(400)}&party_size=2`);
+  check('availability shows slots beyond the booking horizon as not bookable',
+    farAv.status === 200 && farAv.json.slots.every(s => !s.available && s.status === 'not_open_yet'));
   const raw = (method, url, headers, body) => fetch(base + url, { method, headers, body })
     .then(async r => ({ status: r.status, json: await r.json().catch(() => null) }));
   const enc = await raw('POST', '/api/reservations', { 'Content-Type': 'application/json', 'Content-Encoding': 'bogus' }, '{}');

@@ -221,10 +221,12 @@ app.get('/api/restaurants/:id/availability', (req, res) => {
     const utcIso = zonedTimeToUtc(date, time, r.tz).toISOString();
     const free = tables.filter(t => !booked.has(`${t.id}|${utcIso}`)).length;
     const past = Date.parse(utcIso) <= now;
+    const tooFar = Date.parse(utcIso) > now + BOOKING_HORIZON_DAYS * 86400000;
+    const closed = past || tooFar;
     return {
       time, utc: utcIso, display_time: formatTime(utcIso, tz),
-      available: !past && free > 0, tables_available: past ? 0 : free,
-      status: past ? 'past' : free > 0 ? 'open' : 'full',
+      available: !closed && free > 0, tables_available: closed ? 0 : free,
+      status: past ? 'past' : tooFar ? 'not_open_yet' : free > 0 ? 'open' : 'full',
     };
   });
   res.json({ restaurant: r.id, date, party_size: party, tz, slots });

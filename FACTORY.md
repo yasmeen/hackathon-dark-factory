@@ -122,8 +122,8 @@ What the independent reviewer did in run 2 — the review changed the product:
 
 | Item | Measured |
 |---|---|
-| stage-1 checks | 39 passing (run-1 code against the first 33 of them: 15 pass, 18 fail) |
-| stage-2 checks | 39 + 24 waitlist/admin passing |
+| stage-1 checks | 40 passing (run-1 code against the first 33 of them: 15 pass, 18 fail) |
+| stage-2 checks | 40 + 24 waitlist/admin passing |
 | Concurrency | 50 parallel bookings for one table across 4 processes → 1×201, 49×409 |
 | Mutation check | intact 1 winner · no transaction 1 · no unique index 1 · neither 4 — the race test can fail |
 | Test runtime | stage-1 ≈ 5 s, stage-2 ≈ 8 s (`npm test`) |

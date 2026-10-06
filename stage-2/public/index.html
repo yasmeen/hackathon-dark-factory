@@ -168,6 +168,8 @@ fetch('/api/restaurants').then(r => r.json()).then(({restaurants}) => {
       const d = new Date(); d.setDate(d.getDate() + 1);
       $('date').value = localDate(d);
       $('date').min = localDate(new Date());
+      const max = new Date(); max.setDate(max.getDate() + 364);
+      $('date').max = localDate(max);
     };
     el.addEventListener('click', pick);
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
@@ -185,7 +187,7 @@ $('toSlots').addEventListener('click', async () => {
   $('slotHint').textContent = `Times are local to ${state.resto.name} (${state.resto.tz.replace(/_/g, ' ')}).`;
   $('slots').innerHTML = slots.map(s =>
     `<button class="slot ${esc(s.status)}" ${s.status === 'past' ? 'disabled' : ''} data-t="${esc(s.time)}" data-full="${s.status === 'full' ? 1 : ''}"
-       title="${s.status === 'full' ? 'Fully booked — join the waitlist' : s.status === 'past' ? 'Already started' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}${s.status === 'full' ? '<br><span class="wl">waitlist</span>' : ''}</button>`).join('')
+       title="${s.status === 'full' ? 'Fully booked — join the waitlist' : s.status === 'past' ? 'Already started' : s.status === 'not_open_yet' ? 'Bookings open 365 days ahead' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}${s.status === 'full' ? '<br><span class="wl">waitlist</span>' : ''}</button>`).join('')
     || '<p style="color:var(--muted)">No availability that day.</p>';
   if (slots.some(s => s.status === 'full'))
     $('slots').insertAdjacentHTML('beforeend', '<p class="legend">Dashed times are fully booked — pick one to join its waitlist. If a table frees up, you are booked onto it automatically.</p>');

@@ -23,7 +23,7 @@ Node.js ≥ 22.5, no other system dependencies:
 ```sh
 cd stage-2
 npm ci
-npm test     # 63 checks + mutation check: 50-way race across 4 processes, DST, waitlist
+npm test     # 64 checks + mutation check: 50-way race across 4 processes, DST, waitlist
 npm start    # http://localhost:3000  ·  admin: http://localhost:3000/admin
 ```
 

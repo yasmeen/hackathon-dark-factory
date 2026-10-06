@@ -289,3 +289,52 @@ gap, not a defect, but the fix is one line and it's the same code path).
 
 Verify: `npm test` in each stage (stage-1 39 + mutation; stage-2 39 + 24 +
 mutation).
+
+## [reviewer] 2026-10-06 — re-verification: D1–D4 FIXED, 1 new defect
+
+_Recorded verbatim._
+
+Fresh copies (tar, excl. node_modules/ data/) → /tmp/claude-0/reviewer-scratch/v2/stage-{1,2}; `npm ci` (0 vulns) on both. Stage-1 `npm test`: 39/39 + mutation expectations hold. Stage-2: 39/39 + 24/24 + mutation expectations hold. Probes against 2 server processes per stage sharing a scratch DB (stage-1 :5801/:5802, stage-2 :5811/:5812). Repo `git status` clean (no edits).
+
+D1 — FIXED
+- 0000-01-01, 0001-01-01, 0099-06-01, 0999-01-01, 1969-12-31 → 400 INVALID_DATE on availability, POST /api/reservations, POST /api/waitlist (both stages); previously 500.
+- 3000-01-01, 9999-12-31 → 400 INVALID_DATE.
+- 1970-01-01 → 400 SLOT_IN_PAST; 2027-10-08 and 2999-12-31 → 400 TOO_FAR_AHEAD; 2027-10-05 → 201.
+
+D2 — FIXED
+- `Content-Encoding: bogus` → 415 `{"error":"unsupported content encoding \"bogus\""}`.
+- Corrupt gzip body → 400 JSON; corrupt deflate body on /api/waitlist → 400 JSON.
+- `GET /api/restaurants/%E0%A4%A/availability`, `DELETE /api/reservations/%ZZ` → 400 `{"error":"bad request"}`; stage-2 `DELETE /api/waitlist/%ZZ` → 400.
+- 131-case malformed-input sweep: 0 flagged on both stages (previously 5); no errors in server logs.
+
+D3 — FIXED
+- Playwright 380px, booking confirmation with unbroken names of 25/30/40/80 chars: scrollWidth 380 every time, both stages (previously 401 at 30 chars, 900 at 80).
+- /admin listing those 80-char names: scrollWidth 380.
+
+D4 — FIXED
+- Both mutants re-run against the new stage-2 test/waitlist.js are now caught, 2 runs each:
+  - commit before promote → FAIL (cancel returned 500, a sniper got 201, promotion count 4 not 5);
+  - ignore party fit → FAIL ("Big" party of 10 promoted onto 6-top T4).
+
+Regression spot-checks — all held:
+- 50-way race across 2 processes, production config, 3 scenarios per stage → {201:1, 409:49} each.
+- Waitlist against the live server: promotion respected party fit (Six6, then Big8); 10 concurrent cancels + 40 snipers + 5 joins → one 200, 40×409, one promotion; leave: wrong phone 404 → 200 → 409; positions updated.
+- Earlier stage-1 mutants still caught by run.js: tx removed + rethrow (500 caught); off-grid allowed; client tz used for interpretation.
+- Full UI flow, both stages: `<img onerror>` / `"><svg onload>` names never rendered as markup on confirmation, waitlist confirmation, My reservations, admin; no horizontal scroll at 380px at any step; waitlist join/leave works in the UI; no console errors.
+
+### New defect reports
+1. **D5 (low): availability lists slots as bookable that booking now refuses (a side effect of fix 1, both stages).** Repro: `GET :5811/api/restaurants/casa-verde/availability?date=2027-11-01&party_size=2` → 12:00 slot `{"available":true,"tables_available":8,"status":"open"}`; then `POST /api/reservations {"restaurant_id":"casa-verde","date":"2027-11-01","time":"12:00","party_size":2,"name":"a","phone":"1"}` → 400 TOO_FAR_AHEAD. Expected: availability marks slots beyond the 365-day horizon as not bookable (as it does for `past`); the guest UI date picker sets a min but no max. Observed: a guest can pick a date >1 year ahead, see open slots, and be refused only at Confirm.
+- Note (not counted as a defect): test/run.js still books fixed dates (2027-07-15, 2027-07-16, 2027-01-15); the suite will start failing once those dates pass (~2027-07-16) with no code change.
+
+Overall: FAIL (1 defect)
+
+## [implementer] 2026-10-06 — handoff: D5 + dated tests
+
+- server.js (both): availability marks slots beyond the 365-day horizon
+  `available:false`, `status:"not_open_yet"`; index.html date picker gets a
+  max date.
+- test/run.js (both): +1 check (availability beyond the horizon is not
+  bookable); the July/January timezone checks now use the next future
+  occurrence of each date, so the suite no longer expires.
+
+Verify: `npm test` (stage-1 40 + mutation; stage-2 40 + 24 + mutation).
