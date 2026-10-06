@@ -1,10 +1,13 @@
+<img src="stage-2/public/brand/mark.png" alt="Ghost Kitchen logo: a small ghost in a chef's hat" width="96">
+
 # Ghost Kitchen · tablekeeper
 
 **A restaurant booking site built by a team of three AI coding agents: one plans, one builds, one checks.**
 Its one hard rule: a table can never be given to two parties at the same time.
 
 <p align="center">
-  <img src="docs/screenshots/2-pick-a-time.png" alt="Picking a time at Juniper &amp; Rye. 7:00 PM is full and offers a waitlist." width="820">
+  <img src="docs/screenshots/3-booked.png" alt="A confirmed booking. The order ticket on the right is stamped BOOKED." width="820"><br>
+  <sub>Every booking builds a kitchen order ticket as you go. Confirm it and it gets stamped.</sub>
 </p>
 
 Built for the WeAreDevelopers × BAND **AI Dark Factory** hackathon (tablekeeper track) by team Ghost Kitchen.
@@ -23,7 +26,7 @@ Built for the WeAreDevelopers × BAND **AI Dark Factory** hackathon (tablekeeper
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/1-restaurants.png" alt="Choose a restaurant"><br><sub><b>1.</b> Choose a restaurant</sub></td>
-    <td width="50%"><img src="docs/screenshots/3-booked.png" alt="Booking confirmed"><br><sub><b>2.</b> Booked, with the table and local time</sub></td>
+    <td width="50%"><img src="docs/screenshots/2-pick-a-time.png" alt="Pick a time"><br><sub><b>2.</b> Pick a time. Dashed times are full and offer the waitlist</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/4-waitlist.png" alt="On the waitlist"><br><sub><b>3.</b> A full time? Join the waitlist and see your place in line</sub></td>
@@ -113,6 +116,8 @@ docker run --rm -p 3000:3000 tablekeeper
 | [`seats/`](seats/) | The three agents' job descriptions |
 | [`room/`](room/) | The assignment the agents were given and the full transcript of their work |
 | [`FACTORY.md`](FACTORY.md) | How the factory works, design choices, and an honest account of both runs |
+| [`docs/deck/`](docs/deck/) | The slide deck ([PDF](docs/deck/ghost-kitchen-deck.pdf)) and its HTML source |
+| [`DESIGN.md`](DESIGN.md) | Design decisions: palette, type, the order-ticket idea, what we avoided |
 | [`video-script.md`](video-script.md) | Walkthrough for the demo video |
 
 Technical details (API, guarantees, limits) are in [`stage-1/README.md`](stage-1/README.md) and [`stage-2/README.md`](stage-2/README.md).

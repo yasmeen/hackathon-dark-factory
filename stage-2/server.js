@@ -357,7 +357,7 @@ app.post('/api/waitlist', (req, res) => {
   try {
     tx.begin();
     if (freeTables(p.r.id, p.party, p.utcIso).length) {
-      out = fail(409, 'a table is free for that slot — book it instead', 'SLOT_AVAILABLE');
+      out = fail(409, 'a table is free for that slot; book it instead', 'SLOT_AVAILABLE');
     } else {
       const id = randomUUID();
       db.prepare(`INSERT INTO waitlist

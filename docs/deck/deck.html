@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ghost Kitchen · tablekeeper</title>
+<style>
+@font-face { font-family: 'Big Shoulders Display'; src: url('../../stage-2/public/fonts/big-shoulders-display.woff2') format('woff2'); font-weight: 100 900; }
+@font-face { font-family: 'Schibsted Grotesk'; src: url('../../stage-2/public/fonts/schibsted-grotesk.woff2') format('woff2'); font-weight: 400 900; }
+@font-face { font-family: 'Martian Mono'; src: url('../../stage-2/public/fonts/martian-mono.woff2') format('woff2'); font-weight: 100 800; }
+:root { --stainless:#E8E9E6; --thermal:#FCFCFA; --grill:#1F201C; --pencil:#5F625B; --glaze:#F9A254; --orderup:#B8321A; --fired:#2F6F45;
+  --display:'Big Shoulders Display', sans-serif; --body:'Schibsted Grotesk', sans-serif; --mono:'Martian Mono', monospace; }
+@page { size: 1920px 1080px; margin: 0; }
+* { box-sizing: border-box; margin: 0; }
+body { background: #777; font-family: var(--body); color: var(--grill); }
+.slide { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: var(--stainless); padding: 110px 130px; page-break-after: always; break-after: page; }
+.slide + .slide { margin-top: 0; }
+.dark { background: var(--grill); color: var(--thermal); }
+.kicker { font: 400 22px/1 var(--mono); color: var(--pencil); margin-bottom: 34px; }
+.dark .kicker { color: #A9ABA4; }
+h1 { font: 800 150px/.88 var(--display); letter-spacing: .005em; }
+h2 { font: 800 96px/.92 var(--display); letter-spacing: .005em; margin-bottom: 44px; max-width: 1500px; }
+p.lead { font-size: 40px; line-height: 1.3; max-width: 1300px; }
+.muted { color: var(--pencil); }
+.dark .muted { color: #A9ABA4; }
+.foot { position: absolute; left: 130px; right: 130px; bottom: 56px; display: flex; justify-content: space-between; font: 400 18px/1 var(--mono); color: var(--pencil); }
+.dark .foot { color: #8E9089; }
+.foot img { width: 30px; height: 30px; vertical-align: middle; margin-right: 10px; }
+.glaze { color: var(--glaze); }
+.shot { border: 2px solid var(--grill); display: block; }
+
+/* reusable ticket */
+.ticket { background: var(--thermal); color: var(--grill); font: 400 22px/1.55 var(--mono); text-transform: uppercase; padding: 34px 28px 44px; position: relative;
+  box-shadow: 0 22px 40px -22px rgba(0,0,0,.5);
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 14px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 20px 14px repeat-x; }
+.t-head { background: var(--glaze); padding: 8px 12px; margin: 0 -8px 20px; display: flex; justify-content: space-between; }
+.ticket .ln { display: flex; justify-content: space-between; gap: 16px; }
+.ticket .ln span:first-child { color: var(--pencil); }
+.stamp { position: absolute; font: 800 56px/1 var(--display); letter-spacing: .05em; color: var(--orderup); border: 5px solid var(--orderup); padding: 8px 16px 4px; transform: rotate(-8deg); background: rgba(252,252,250,.85); }
+.stamp.ok { color: var(--fired); border-color: var(--fired); }
+.rail { height: 22px; background: linear-gradient(#c9cbc6, #9fa29b); border: 2px solid var(--grill); border-radius: 4px; }
+
+/* role table */
+.roles { width: 100%; border-collapse: collapse; font-size: 34px; }
+.roles th { text-align: left; font: 600 20px/1 var(--mono); color: var(--pencil); text-transform: uppercase; padding: 0 24px 18px 0; border-bottom: 2px solid var(--grill); }
+.roles td { padding: 30px 24px 30px 0; border-bottom: 1px solid rgba(31,32,28,.2); vertical-align: top; }
+.roles td:first-child { font: 800 56px/1 var(--display); width: 300px; }
+.roles td:last-child { color: var(--orderup); }
+
+.mut { width: 1200px; border-collapse: collapse; font: 400 30px/1.2 var(--mono); }
+.mut td, .mut th { padding: 22px 20px 22px 0; border-bottom: 1px solid rgba(31,32,28,.2); text-align: left; }
+.mut th { font-size: 20px; color: var(--pencil); text-transform: uppercase; border-bottom: 2px solid var(--grill); }
+.mut td:nth-child(2) { font-weight: 600; font-size: 40px; }
+.mut tr.caught td { color: var(--orderup); }
+</style>
+</head>
+<body>
+
+<!-- 1. cover -->
+<section class="slide" id="cover">
+  <div style="display:flex; gap:90px; align-items:center; height:100%; margin-top:-30px">
+    <div style="flex:1">
+      <img src="../../stage-2/public/brand/mark.png" alt="" style="width:170px; height:170px; margin-left:-14px">
+      <h1 style="margin-top:26px">Ghost<br>Kitchen</h1>
+      <p class="lead" style="margin-top:40px; max-width:760px">Three AI agents built a restaurant booking app. A table never goes to two parties.</p>
+    </div>
+    <div style="width:820px">
+      <div class="shot" style="width:820px; height:424px; overflow:hidden"><img src="../screenshots/3-booked.png" alt="" style="width:816px; display:block"></div>
+    </div>
+  </div>
+  <div class="foot"><span>WeAreDevelopers × BAND · AI Dark Factory · tablekeeper track</span><span>team ghost kitchen</span></div>
+</section>
+
+<!-- 2. assignment -->
+<section class="slide">
+  <div class="kicker">The assignment</div>
+  <h2>Build a booking site where a table can never be double-booked.</h2>
+  <p class="lead">Guests browse restaurants, check a time, book, and cancel. The catch: it has to hold when <b>two people click at the same second</b>, when a request is <b>sent twice</b>, and when restaurants sit in <b>different time zones</b>.</p>
+  <p class="lead muted" style="margin-top:36px">And the app isn't really the entry. The team that built it is.</p>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>2 / 10</span></div>
+</section>
+
+<!-- 3. the factory -->
+<section class="slide">
+  <div class="kicker">The factory</div>
+  <h2>Three AI agents. One job each.</h2>
+  <table class="roles">
+    <tr><th>Agent</th><th>Does</th><th>Is not allowed to</th></tr>
+    <tr><td>Planner</td><td>Splits the assignment into tasks and writes how anyone could tell each one is finished</td><td>Write code</td></tr>
+    <tr><td>Builder</td><td>Writes the code and hands each task over with the commands to check it</td><td>Mark its own work done</td></tr>
+    <tr><td>Checker</td><td>Tests the work, tries to break it, reports exactly what failed</td><td>Fix anything itself</td></tr>
+  </table>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>3 / 10</span></div>
+</section>
+
+<!-- 4. why split -->
+<section class="slide dark">
+  <div class="kicker">Why split it up</div>
+  <h1 style="font-size:132px; max-width:1500px">An agent that grades its own work gives itself an A.</h1>
+  <p class="lead" style="margin-top:56px">So "done" means <span class="glaze">someone else actually saw it work.</span></p>
+  <p class="lead muted" style="margin-top:28px; font-size:30px">The job descriptions never mention restaurants, so the same three can be pointed at a different assignment. A person hands over the assignment and steers between steps; the agents plan, build and check.</p>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>4 / 10</span></div>
+</section>
+
+<!-- 5. what it shipped -->
+<section class="slide">
+  <div class="kicker">What it shipped: tablekeeper</div>
+  <div style="display:flex; gap:40px; align-items:flex-start">
+    <div style="width:1080px">
+      <div class="shot" style="width:1080px; height:560px; overflow:hidden"><img src="../screenshots/2-pick-a-time.png" alt="" style="width:1076px; display:block"></div>
+      <p class="muted" style="font-size:26px; margin-top:16px">Pick a time. Full times offer the waitlist. The ticket on the right fills in as you go.</p>
+    </div>
+    <div style="flex:1">
+      <img class="shot" src="../screenshots/5-admin.png" alt="" style="width:100%">
+      <p class="muted" style="font-size:26px; margin-top:16px">Admin: a cancellation, and the guest moved up from the waitlist onto that table.</p>
+    </div>
+  </div>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>5 / 10</span></div>
+</section>
+
+<!-- 6. the hard part -->
+<section class="slide">
+  <div class="kicker">The hard part</div>
+  <div style="display:flex; gap:90px">
+    <div style="flex:1">
+      <h2 style="font-size:84px">Four things stop a double booking.</h2>
+      <ol style="font-size:34px; line-height:1.4; padding-left:42px">
+        <li style="margin-bottom:18px"><b>One booking at a time.</b> The database locks while a booking is checked and saved.</li>
+        <li style="margin-bottom:18px"><b>The database refuses duplicates.</b> One table, one slot, one confirmed booking.</li>
+        <li style="margin-bottom:18px"><b>Repeats are recognized.</b> A request sent twice books once.</li>
+        <li><b>Only real slots.</b> 7:00 or 7:30, never 7:15, so nothing overlaps quietly.</li>
+      </ol>
+    </div>
+    <div style="width:560px; padding-top:20px">
+      <div class="rail"></div>
+      <div class="ticket" style="margin:-8px 30px 0; padding-bottom:150px">
+        <div class="t-head"><span>Race test</span><span>×50</span></div>
+        <div class="ln"><span>Bookings sent</span><span>50</span></div>
+        <div class="ln"><span>Same table</span><span>yes</span></div>
+        <div class="ln"><span>Server procs</span><span>4</span></div>
+        <div class="ln"><span>Got the table</span><span><b>1</b></span></div>
+        <div class="ln"><span>Told "taken"</span><span><b>49</b></span></div>
+        <div class="stamp ok" style="left:44px; bottom:36px">Held</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>6 / 10</span></div>
+</section>
+
+<!-- 7. testing the test -->
+<section class="slide">
+  <div class="kicker">Testing the test</div>
+  <h2>A test that can't fail proves nothing. So we broke the app on purpose.</h2>
+  <table class="mut">
+    <tr><th>What we removed</th><th>Got the table</th><th></th></tr>
+    <tr><td>Nothing</td><td>1</td><td class="muted">held</td></tr>
+    <tr><td>The lock</td><td>1</td><td class="muted">the database rule still holds</td></tr>
+    <tr><td>The database rule</td><td>1</td><td class="muted">the lock still holds</td></tr>
+    <tr class="caught"><td>Both</td><td>4</td><td>double-booked, and the test catches it</td></tr>
+  </table>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>7 / 10</span></div>
+</section>
+
+<!-- 8. the checker changed the product -->
+<section class="slide">
+  <div class="kicker">Did review change anything? Yes.</div>
+  <h2 style="margin-bottom:24px">The Checker rejected the work three times.</h2>
+  <p class="lead muted" style="font-size:30px; margin-bottom:46px">Run 1's Checker approved broken work. An audit caught it, and its instructions were rewritten: prove every safety test can fail. In run 2, an independent Checker found 7 problems. All were fixed before it passed.</p>
+  <div class="rail"></div>
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:36px; margin:-8px 26px 0">
+    <div class="ticket" style="font-size:19px; padding-bottom:120px"><div class="t-head"><span>Round 1</span></div><div>Odd dates crash</div><div>Malformed requests crash</div><div>Long name breaks phone layout</div><div>2 tests can't fail</div><div class="stamp" style="right:22px; bottom:26px; font-size:46px">Fail ×4</div></div>
+    <div class="ticket" style="font-size:19px; padding-bottom:120px"><div class="t-head"><span>Round 2</span></div><div>Fixes 1 to 4 OK</div><div>Shows times it won't book</div><div>&nbsp;</div><div>&nbsp;</div><div class="stamp" style="right:22px; bottom:26px; font-size:46px">Fail ×1</div></div>
+    <div class="ticket" style="font-size:19px; padding-bottom:120px"><div class="t-head"><span>Round 3</span></div><div>Same, in the UI</div><div>Tests break 2 days a year</div><div>&nbsp;</div><div>&nbsp;</div><div class="stamp" style="right:22px; bottom:26px; font-size:46px">Fail ×2</div></div>
+    <div class="ticket" style="font-size:19px; padding-bottom:120px"><div class="t-head"><span>Round 4</span></div><div>All 7 fixed</div><div>Test dates checked hourly for 3 years</div><div>&nbsp;</div><div>&nbsp;</div><div class="stamp ok" style="right:22px; bottom:26px; font-size:46px">Pass</div></div>
+  </div>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>8 / 10</span></div>
+</section>
+
+<!-- 9. reusable + proof -->
+<section class="slide">
+  <div class="kicker">What you can check yourself</div>
+  <h2>Everything is in the repo.</h2>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:30px 80px; font-size:34px; line-height:1.35; max-width:1560px">
+    <div><b style="font:600 64px/1.1 var(--mono)">64</b><br>checks pass, plus the break-it-on-purpose test</div>
+    <div><b style="font:600 64px/1.1 var(--mono)">0</b><br>network needed: it starts in a container with networking switched off</div>
+    <div><b style="font:600 64px/1.1 var(--mono)">3</b><br>job descriptions, none mentioning restaurants</div>
+    <div><b style="font:600 64px/1.1 var(--mono)">1</b><br>transcript with every plan, handoff and verdict, including the wrong ones</div>
+  </div>
+  <div class="foot"><span><img src="../../stage-2/public/brand/mark.png" alt="">Ghost Kitchen</span><span>9 / 10</span></div>
+</section>
+
+<!-- 10. close -->
+<section class="slide dark">
+  <div style="display:flex; flex-direction:column; justify-content:center; height:100%; margin-top:-40px">
+    <img src="../../stage-2/public/brand/mark.png" alt="" style="width:150px; height:150px; margin-left:-12px">
+    <h1 style="margin-top:30px">Book a table.<br><span class="glaze">It stays yours.</span></h1>
+    <p class="lead muted" style="margin-top:44px; font:400 30px/1.4 var(--mono)">github.com/yasmeen/hackathon-dark-factory</p>
+  </div>
+  <div class="foot"><span>Ghost Kitchen · tablekeeper</span><span>10 / 10</span></div>
+</section>
+
+</body>
+</html>
