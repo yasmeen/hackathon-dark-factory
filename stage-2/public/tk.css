@@ -140,4 +140,40 @@ footer { max-width: 1120px; margin: 0 auto; padding: 8px 20px 36px; color: var(-
   .mast .line { margin-left: 0; width: 100%; }
   .resto h3 { font-size: 24px; }
   .ticket { margin: -6px 10px 0; }
+
+  /* guest app on phones (admin shares this file, so selectors stay guest-only) */
+  .tab { min-height: 44px; }
+
+  /* steps: one balanced row. Inactive steps show only their number; the
+     active one spells out its label. Full text stays in the DOM for readers. */
+  .steps { flex-wrap: nowrap; gap: 4px; margin-bottom: 18px; }
+  .step { flex: 1 1 0; min-width: 0; min-height: 40px; padding: 6px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 0; }
+  .step::after { content: attr(data-s); font-size: 13px; line-height: 1.2; }
+  .step.done::before { font-size: 13px; line-height: 1.2; }
+  .step.active { flex-grow: 3; font-size: 13px; line-height: 1.2; padding: 6px 8px; }
+  .step.active::after { content: none; }
+
+  .resto { padding: 14px 10px 14px 12px; }
+  .resto .meta { line-height: 1.5; text-wrap: balance; }
+
+  .slots { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .slot { min-height: 44px; }
+
+  .actions .btn { flex: 1 1 auto; text-align: center; min-height: 48px; }
+  .cancel { min-height: 44px; padding: 10px 16px; }
+
+  /* shorter ticket: lines appear as they are filled in */
+  .desk { gap: 20px; }
+  .pass { padding-top: 6px; }
+  .ticket { padding: 22px 14px 26px; line-height: 1.45; }
+  .t-head { margin: 6px -4px 10px; }
+  .t-rule { margin: 10px 0; }
+  .ticket dl div:has(> dd.empty) { display: none; }
+  .ticket .stamp { position: static; display: table; margin: 16px 0 0 auto; transform: rotate(-5deg); }
+}
+
+/* iOS zooms into inputs under 16px; touch devices only, desktop untouched */
+@media (max-width: 860px), (hover: none) and (pointer: coarse) {
+  .field input, .field select { font-size: 16px; min-height: 48px; min-width: 0; }
+  .field input::-webkit-date-and-time-value { text-align: left; }
 }
