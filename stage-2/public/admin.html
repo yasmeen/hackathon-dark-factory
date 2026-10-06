@@ -4,49 +4,42 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tablekeeper · admin</title>
+<link rel="icon" type="image/png" href="/brand/favicon.png">
+<link rel="stylesheet" href="/tk.css">
 <style>
-  :root { --ink:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff; --line:#e7e5e4; --accent:#c2410c; }
-  * { box-sizing:border-box; margin:0; }
-  body { font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#1c1917; color:#fafaf9; padding:20px; }
-  header .wrap { padding:0 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-  header h1 { font-size:24px; }
-  header h1 span { color:#fdba74; }
-  header nav { display:flex; gap:12px; align-items:center; }
-  header a { color:#fdba74; font-size:14px; }
-  .wrap { max-width:1100px; margin:0 auto; padding:20px; }
-  h2 { font-size:16px; margin:22px 0 10px; }
-  .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:#fff; }
-  table { width:100%; border-collapse:collapse; font-size:13px; min-width:560px; }
-  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
-  th { background:#f5f5f4; color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-  tr:last-child td { border-bottom:0; }
-  small { color:var(--muted); }
-  .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
-  .confirmed { background:#dcfce7; color:#15803d; } .cancelled, .left { background:#f5f5f4; color:var(--muted); }
-  .waiting { background:#fef3c7; color:#b45309; } .booked, .promo { background:#dbeafe; color:#1d4ed8; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
-  .stat { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; }
-  .stat b { font-size:24px; display:block; } .stat span { color:var(--muted); font-size:12px; }
-  .refresh { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:10px 18px; cursor:pointer; font-size:14px; }
-  .err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:12px; margin-top:16px; display:none; }
-  @media (max-width:520px){ header h1{font-size:20px;} .wrap{padding:16px;} }
+  .counts { display: flex; flex-wrap: wrap; gap: 10px 36px; padding: 6px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .counts div { display: flex; flex-direction: column; }
+  .counts b { font: 600 28px/1.1 var(--mono); }
+  .counts span { color: var(--pencil); font-size: 13px; }
+  .bar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .scroll { overflow-x: auto; background: var(--thermal); border: 1px solid var(--grill); margin-bottom: 30px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  th { font: 600 11px/1.2 var(--mono); color: var(--pencil); text-transform: uppercase; letter-spacing: .04em; border-bottom-color: var(--grill); }
+  tr:last-child td { border-bottom: 0; }
+  td.when { font-family: var(--mono); white-space: nowrap; }
+  small { color: var(--pencil); font-family: var(--mono); }
+  .tag { display: inline-block; font: 600 11px/1 var(--mono); text-transform: uppercase; padding: 4px 6px; border: 1px solid currentColor; border-radius: 3px; white-space: nowrap; }
+  .confirmed { color: var(--fired); } .cancelled, .left { color: var(--pencil); }
+  .waiting { color: #8a5a00; } .booked, .promo { color: var(--grill); background: var(--glaze); border-color: var(--grill); }
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>table<span>keeper</span> · admin</h1>
-  <nav><button class="refresh" id="refresh">Refresh</button><a href="/">← guest view</a></nav></div></header>
-<div class="wrap">
-  <div class="err" id="err"></div>
-  <h2>At a glance</h2>
-  <div class="cards" id="stats"></div>
-  <h2>Upcoming reservations</h2>
+<header class="mast">
+  <img src="/brand/mark.png" alt="">
+  <a class="word" href="/admin">tablekeeper</a>
+  <p class="line"><b>Admin.</b> Who is eating where, and who is waiting.</p>
+</header>
+<main class="wrap">
+  <div class="err" id="err" role="alert"></div>
+  <div class="counts" id="stats"></div>
+  <div class="bar"><h2>Upcoming reservations</h2><span><button class="btn ghost" id="refresh">Refresh</button> <a class="btn ghost" href="/">Guest view</a></span></div>
   <div class="scroll"><table><thead><tr><th>When (restaurant time)</th><th>Restaurant</th><th>Table</th><th>Party</th><th>Guest</th><th>Status</th></tr></thead>
   <tbody id="resv"></tbody></table></div>
   <h2>Waitlist</h2>
   <div class="scroll"><table><thead><tr><th>When (restaurant time)</th><th>Restaurant</th><th>Party</th><th>Guest</th><th>Status</th></tr></thead>
   <tbody id="wait"></tbody></table></div>
-</div>
+</main>
 <script>
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c =>
@@ -56,28 +49,28 @@ const token = new URLSearchParams(location.search).get('token');
 async function load() {
   const res = await fetch('/api/admin/overview', { headers: token ? { 'x-admin-token': token } : {} });
   if (!res.ok) {
-    $('err').textContent = res.status === 401 ? 'Admin token required — open /admin?token=…' : 'Could not load the dashboard.';
+    $('err').textContent = res.status === 401 ? 'Admin token required. Open /admin?token=…' : 'Could not load the dashboard.';
     $('err').style.display = 'block';
     return;
   }
   $('err').style.display = 'none';
   const { stats, reservations, waitlist } = await res.json();
   $('stats').innerHTML = [
-    [stats.upcoming_confirmed, 'upcoming confirmed'],
-    [stats.waiting, 'guests on a waitlist'],
+    [stats.upcoming_confirmed, 'upcoming, confirmed'],
+    [stats.waiting, 'waiting for a table'],
     [stats.promoted, 'booked from the waitlist'],
-    [stats.cancelled, 'cancellations'],
-  ].map(([n, label]) => `<div class="stat"><b>${esc(n)}</b><span>${esc(label)}</span></div>`).join('');
+    [stats.cancelled, 'cancelled'],
+  ].map(([n, label]) => `<div><b>${esc(n)}</b><span>${esc(label)}</span></div>`).join('');
   $('resv').innerHTML = reservations.map(r => `
-    <tr><td>${esc(r.when_local)}</td><td>${esc(r.restaurant)}</td><td>${esc(r.tbl)}</td><td>${esc(r.party_size)}</td>
+    <tr><td class="when">${esc(r.when_local)}</td><td>${esc(r.restaurant)}</td><td>${esc(r.tbl)}</td><td>${esc(r.party_size)}</td>
     <td>${esc(r.name)}<br><small>${esc(r.phone)}</small></td>
-    <td><span class="pill ${esc(r.status)}">${esc(r.status)}</span>${r.from_waitlist ? ' <span class="pill promo">from waitlist</span>' : ''}</td></tr>`).join('')
-    || '<tr><td colspan="6">None yet.</td></tr>';
+    <td><span class="tag ${esc(r.status)}">${esc(r.status)}</span>${r.from_waitlist ? ' <span class="tag promo">from waitlist</span>' : ''}</td></tr>`).join('')
+    || '<tr><td colspan="6">Nothing booked yet.</td></tr>';
   $('wait').innerHTML = waitlist.map(w => `
-    <tr><td>${esc(w.when_local)}</td><td>${esc(w.restaurant)}</td><td>${esc(w.party_size)}</td>
+    <tr><td class="when">${esc(w.when_local)}</td><td>${esc(w.restaurant)}</td><td>${esc(w.party_size)}</td>
     <td>${esc(w.name)}<br><small>${esc(w.phone)}</small></td>
-    <td><span class="pill ${esc(w.status)}">${esc(w.status)}</span></td></tr>`).join('')
-    || '<tr><td colspan="5">Empty.</td></tr>';
+    <td><span class="tag ${esc(w.status)}">${esc(w.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="5">Nobody is waiting.</td></tr>';
 }
 $('refresh').addEventListener('click', load);
 load();

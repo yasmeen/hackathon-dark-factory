@@ -3,134 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tablekeeper — book a table</title>
-<style>
-  :root { --ink:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff; --accent:#c2410c; --accent-d:#9a3412; --line:#e7e5e4; --ok:#15803d; }
-  * { box-sizing:border-box; margin:0; }
-  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#1c1917; color:#fafaf9; padding:28px 20px; }
-  header .wrap { max-width:960px; margin:0 auto; }
-  header h1 { font-size:28px; letter-spacing:-.02em; }
-  header h1 span { color:#fdba74; }
-  header p { color:#a8a29e; margin-top:6px; font-size:15px; }
-  .wrap { max-width:960px; margin:0 auto; padding:20px; }
-  .steps { display:flex; gap:8px; margin:18px 0 24px; flex-wrap:wrap; }
-  .step { flex:1; min-width:120px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); font-size:13px; color:var(--muted); }
-  .step.active { border-color:var(--accent); color:var(--accent-d); font-weight:600; }
-  .step.done { color:var(--ok); border-color:#bbf7d0; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px; }
-  .card h2 { font-size:17px; margin-bottom:12px; }
-  .restos { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
-  .resto { border:1px solid var(--line); border-radius:12px; padding:16px; cursor:pointer; transition:.15s; background:#fff; }
-  .resto:hover { border-color:var(--accent); transform:translateY(-1px); }
-  .resto.sel { border:2px solid var(--accent); }
-  .resto h3 { font-size:16px; } .resto p { color:var(--muted); font-size:13px; margin-top:4px; }
-  .row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-  label { font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
-  input, select { font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--ink); }
-  .field { flex:1; min-width:140px; }
-  .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; margin-top:8px; }
-  .slot { padding:10px; text-align:center; border:1px solid var(--line); border-radius:10px; cursor:pointer; font-size:14px; background:#fff; }
-  .slot:hover:not(:disabled) { border-color:var(--accent); }
-  .slot.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
-  .slot:disabled { opacity:.35; cursor:not-allowed; text-decoration:line-through; }
-  .slot.full:not(:disabled) { border-style:dashed; color:var(--muted); }
-  .slot.full:not(:disabled):hover { color:var(--accent-d); }
-  .legend { grid-column:1/-1; color:var(--muted); font-size:12px; margin-top:4px; }
-  .wl { color:#b45309; font-size:12px; font-weight:600; }
-  footer a { color:var(--muted); }
-  .hint { color:var(--muted); font-size:13px; margin:-4px 0 8px; }
-  .none { grid-column:1/-1; color:var(--muted); font-size:14px; margin-top:6px; }
-  .resto:focus-visible, .slot:focus-visible, .tab:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  .btn { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:14px 22px; font-size:16px; font-weight:600; cursor:pointer; width:100%; }
-  .btn:hover { background:var(--accent-d); } .btn:disabled { opacity:.5; cursor:wait; }
-  .btn.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
-  .confirm { text-align:center; padding:12px 0; }
-  .confirm .big { font-size:44px; } .confirm h2 { margin:8px 0; }
-  .detail { background:#f5f5f4; border-radius:10px; padding:14px; margin:14px 0; text-align:left; font-size:14px; }
-  .detail div { display:flex; justify-content:space-between; padding:4px 0; }
-  .detail div { gap:12px; }
-  .detail span:first-child { color:var(--muted); flex-shrink:0; }
-  .detail span:last-child { text-align:right; min-width:0; overflow-wrap:anywhere; }
-  .mine > div { min-width:0; overflow-wrap:anywhere; }
-  .mine { border-bottom:1px solid var(--line); padding:12px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-  .mine small { color:var(--muted); display:block; margin-top:2px; }
-  .cancel { background:none; border:1px solid #fecaca; color:#b91c1c; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
-  .err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:12px; margin-bottom:12px; font-size:14px; display:none; }
-  .tabs { display:flex; gap:8px; margin-bottom:16px; }
-  .tab { padding:10px 18px; border-radius:999px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px; }
-  .tab.sel { background:#1c1917; color:#fff; border-color:#1c1917; }
-  .hidden { display:none; }
-  footer { text-align:center; color:var(--muted); font-size:12px; padding:24px; }
-  @media (max-width:520px){ header h1{font-size:22px;} .card{padding:16px;} }
-</style>
+<title>tablekeeper · book a table</title>
+<link rel="icon" type="image/png" href="/brand/favicon.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="/tk.css">
 </head>
 <body>
-<header><div class="wrap"><h1>table<span>keeper</span></h1><p>Book a table in seconds. One table, one party, one slot — enforced by the database.</p></div></header>
-<div class="wrap">
-  <div class="tabs">
+<header class="mast">
+  <img src="/brand/mark.png" alt="">
+  <a class="word" href="/">tablekeeper</a>
+  <p class="line">Book a table. <b>It stays yours.</b></p>
+</header>
+
+<main class="wrap">
+  <div class="tabs" role="tablist">
     <button class="tab sel" data-tab="book">Book a table</button>
     <button class="tab" data-tab="mine">My reservations</button>
   </div>
 
-  <div id="tab-book">
-    <div class="steps">
-      <div class="step active" data-s="1">1 · Restaurant</div>
-      <div class="step" data-s="2">2 · Date &amp; party</div>
-      <div class="step" data-s="3">3 · Time</div>
-      <div class="step" data-s="4">4 · Details</div>
-    </div>
-    <div class="err" id="err"></div>
+  <div id="tab-book" class="desk">
+    <section>
+      <div class="steps">
+        <span class="step active" data-s="1">1 Restaurant</span>
+        <span class="step" data-s="2">2 Date &amp; party</span>
+        <span class="step" data-s="3">3 Time</span>
+        <span class="step" data-s="4">4 Name</span>
+      </div>
+      <div class="err" id="err" role="alert"></div>
 
-    <div class="card" id="pane1"><h2>Choose a restaurant</h2><div class="restos" id="restos"></div></div>
+      <div class="pane" id="pane1"><h2>Where are you eating?</h2><div class="restos" id="restos"></div></div>
 
-    <div class="card hidden" id="pane2">
-      <h2>When and how many?</h2>
-      <div class="row">
-        <div class="field"><label>Date</label><input type="date" id="date"></div>
-        <div class="field"><label>Party size</label>
-          <select id="party"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select>
+      <div class="pane hidden" id="pane2">
+        <h2>When, and how many?</h2>
+        <div class="row">
+          <div class="field"><label for="date">Date</label><input type="date" id="date"></div>
+          <div class="field"><label for="party">Party size</label>
+            <select id="party"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select>
+          </div>
         </div>
+        <div class="actions"><button class="btn" id="toSlots">See times</button></div>
       </div>
-      <button class="btn" id="toSlots">See available times</button>
-    </div>
 
-    <div class="card hidden" id="pane3"><h2>Pick a time</h2><p class="hint" id="slotHint"></p><div class="slots" id="slots"></div>
-      <div style="margin-top:14px"><button class="btn ghost" id="back2">← Back</button></div>
-    </div>
-
-    <div class="card hidden" id="pane4">
-      <h2>Your details</h2>
-      <div class="row">
-        <div class="field"><label>Name</label><input id="name" placeholder="Jane Appleseed" autocomplete="name"></div>
-        <div class="field"><label>Phone</label><input id="phone" placeholder="+1 305 555 0100" autocomplete="tel"></div>
+      <div class="pane hidden" id="pane3"><h2>Pick a time</h2><p class="hint" id="slotHint"></p><div class="slots" id="slots"></div>
+        <div class="actions"><button class="btn ghost" id="back2">Back</button></div>
       </div>
-      <div class="detail" id="summary"></div>
-      <button class="btn" id="book">Confirm reservation</button>
-      <div style="margin-top:10px"><button class="btn ghost" id="back3">← Back</button></div>
-    </div>
 
-    <div class="card hidden" id="pane5"><div class="confirm">
-      <div class="big" id="doneIcon">🎉</div><h2 id="doneTitle">You're booked!</h2><p class="hint" id="doneNote"></p>
-      <div class="detail" id="doneDetail"></div>
-      <button class="btn" id="again">Make another reservation</button>
-    </div></div>
+      <div class="pane hidden" id="pane4">
+        <h2>Whose name is it under?</h2>
+        <div class="row">
+          <div class="field"><label for="name">Name</label><input id="name" placeholder="Jane Appleseed" autocomplete="name"></div>
+          <div class="field"><label for="phone">Phone</label><input id="phone" placeholder="+1 305 555 0100" autocomplete="tel"></div>
+        </div>
+        <p class="hint" id="summary"></p>
+        <div class="actions"><button class="btn" id="book">Confirm reservation</button><button class="btn ghost" id="back3">Back</button></div>
+      </div>
+
+      <div class="pane hidden" id="pane5">
+        <h2 id="doneTitle">You're booked.</h2>
+        <p class="hint" id="doneNote"></p>
+        <div class="detail" id="doneDetail"></div>
+        <div class="actions"><button class="btn" id="again">Book another table</button></div>
+      </div>
+    </section>
+
+    <aside class="pass" aria-label="Your booking ticket" aria-live="polite">
+      <div class="rail"></div>
+      <article class="ticket" id="ticket">
+        <div class="t-head"><img src="/brand/mark-ink.png" alt=""><span>tablekeeper</span><span class="no" id="tNo">new</span></div>
+        <dl>
+          <div><dt>Table at</dt><dd id="tResto"></dd></div>
+          <div><dt>Date</dt><dd id="tDate"></dd></div>
+          <div><dt>Party</dt><dd id="tParty"></dd></div>
+          <div><dt>Time</dt><dd id="tTime"></dd></div>
+          <div><dt>Name</dt><dd id="tName"></dd></div>
+        </dl>
+        <hr class="t-rule">
+        <p class="t-foot" id="tFoot">One table, one party, one slot. Two people can't hold the same table.</p>
+        <div class="stamp hidden" id="tStamp"></div>
+      </article>
+    </aside>
   </div>
 
   <div id="tab-mine" class="hidden">
-    <div class="card"><h2>Find my reservations</h2>
-      <div class="row"><div class="field"><label>Phone number used at booking</label><input id="lookupPhone" placeholder="+1 305 555 0100"></div></div>
-      <button class="btn" id="lookup">Look up</button>
-      <div id="mineList" style="margin-top:8px"></div>
+    <h2>Find my reservations</h2>
+    <div class="row">
+      <div class="field"><label for="lookupPhone">Phone number you booked with</label><input id="lookupPhone" placeholder="+1 305 555 0100"></div>
     </div>
+    <div class="actions"><button class="btn" id="lookup">Look up</button></div>
+    <div id="mineList" style="margin-top:14px"></div>
   </div>
-</div>
-<footer>tablekeeper · stage-2 — no double-booking under concurrent requests, retries, or time zones. · <a href="/admin">admin</a></footer>
+</main>
+<footer>tablekeeper, by Ghost Kitchen. Three AI agents built it, and one of them spent the whole time trying to break it. · <a href="/admin">Admin</a></footer>
 
 <script>
 const $ = id => document.getElementById(id);
 // Everything the server echoes back (names, labels) is escaped before it
-// touches innerHTML — guest input must never become markup.
+// touches innerHTML. Guest input must never become markup.
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -140,13 +108,39 @@ const state = { resto:null, date:'', party:2, slot:null, slotLabel:'', key:newKe
 const errBox = $('err');
 const showErr = m => { errBox.textContent = m; errBox.style.display = 'block'; };
 const hideErr = () => errBox.style.display = 'none';
-const step = n => document.querySelectorAll('.step').forEach(s => {
-  const k = +s.dataset.s;
-  s.classList.toggle('active', k === n);
-  s.classList.toggle('done', k < n);
-});
-const show = id => ['pane1','pane2','pane3','pane4','pane5'].forEach(p => $(p).classList.toggle('hidden', p !== id));
 const row = (k, v) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`;
+const show = id => ['pane1','pane2','pane3','pane4','pane5'].forEach(p => $(p).classList.toggle('hidden', p !== id));
+
+// ---- the live ticket ----
+const prettyDate = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+function line(id, value) {
+  const el = $(id);
+  el.textContent = value || '· · · ·';
+  el.classList.toggle('empty', !value);
+}
+function renderTicket(n) {
+  line('tResto', n >= 2 && state.resto && state.resto.name);
+  line('tDate', n >= 3 && prettyDate(state.date));
+  line('tParty', n >= 3 && state.party && `${state.party} ${state.party === 1 ? 'guest' : 'guests'}`);
+  line('tTime', n >= 4 && state.slotLabel);
+  line('tName', n >= 4 && $('name').value.trim());
+}
+function stamp(text, number) {
+  $('tStamp').textContent = text;
+  $('tStamp').classList.remove('hidden', 'press'); void $('tStamp').offsetWidth; $('tStamp').classList.add('press');
+  $('tNo').textContent = number;
+}
+function clearStamp() { $('tStamp').classList.add('hidden'); $('tNo').textContent = 'new'; }
+$('name').addEventListener('input', () => renderTicket(4));
+
+const step = n => {
+  document.querySelectorAll('.step').forEach(s => {
+    const k = +s.dataset.s;
+    s.classList.toggle('active', k === n);
+    s.classList.toggle('done', k < n);
+  });
+  renderTicket(n);
+};
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('sel'));
@@ -157,19 +151,20 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 
 fetch('/api/restaurants').then(r => r.json()).then(({restaurants}) => {
   $('restos').innerHTML = restaurants.map(r =>
-    `<div class="resto" data-id="${esc(r.id)}" tabindex="0" role="button"><h3>${esc(r.name)}</h3>
-     <p>${esc(r.cuisine)} · ${esc(r.opens_at)}–${esc(r.closes_at)} · ${esc(r.tz.split('/').pop().replace(/_/g, ' '))} time</p></div>`).join('');
+    `<div class="resto" data-id="${esc(r.id)}" tabindex="0" role="button"><h3>${esc(r.name)}</h3><span class="go">Choose</span>
+     <p class="meta">${esc(r.cuisine)} · ${esc(r.opens_at)} to ${esc(r.closes_at)} · ${esc(r.tz.split('/').pop().replace(/_/g, ' '))} time</p></div>`).join('');
   document.querySelectorAll('.resto').forEach(el => {
     const pick = () => {
       document.querySelectorAll('.resto').forEach(x => x.classList.remove('sel'));
       el.classList.add('sel');
       state.resto = restaurants.find(r => r.id === el.dataset.id);
-      show('pane2'); step(2); hideErr();
       const d = new Date(); d.setDate(d.getDate() + 1);
       $('date').value = localDate(d);
       $('date').min = localDate(new Date());
       const max = new Date(); max.setDate(max.getDate() + 364);
       $('date').max = localDate(max);
+      state.date = $('date').value; state.party = +$('party').value;
+      show('pane2'); step(2); hideErr();
     };
     el.addEventListener('click', pick);
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
@@ -184,20 +179,18 @@ $('toSlots').addEventListener('click', async () => {
   const res = await fetch(`/api/restaurants/${encodeURIComponent(state.resto.id)}/availability?${q}`);
   const { slots, error } = await res.json();
   if (error) return showErr(error);
-  $('slotHint').textContent = `Times are local to ${state.resto.name} (${state.resto.tz.replace(/_/g, ' ')}).`;
+  $('slotHint').textContent = `Times are local to ${state.resto.name} (${state.resto.tz.split('/').pop().replace(/_/g, ' ')}).`;
   $('slots').innerHTML = slots.map(s =>
     `<button class="slot ${esc(s.status)}" ${s.status === 'past' || s.status === 'not_open_yet' ? 'disabled' : ''} data-t="${esc(s.time)}" data-full="${s.status === 'full' ? 1 : ''}"
-       title="${s.status === 'full' ? 'Fully booked — join the waitlist' : s.status === 'past' ? 'Already started' : s.status === 'not_open_yet' ? 'Bookings open 365 days ahead' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}${s.status === 'full' ? '<br><span class="wl">waitlist</span>' : ''}</button>`).join('')
-    || '<p style="color:var(--muted)">No availability that day.</p>';
+       title="${s.status === 'full' ? 'Fully booked: join the waitlist' : s.status === 'past' ? 'Already started' : s.status === 'not_open_yet' ? 'Bookings open 365 days ahead' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}${s.status === 'full' ? '<span class="wl">waitlist</span>' : ''}</button>`).join('')
+    || '<p class="none">No times that day.</p>';
   if (slots.some(s => s.status === 'full'))
-    $('slots').insertAdjacentHTML('beforeend', '<p class="legend">Dashed times are fully booked — pick one to join its waitlist. If a table frees up, you are booked onto it automatically.</p>');
+    $('slots').insertAdjacentHTML('beforeend', '<p class="legend">Dashed times are full. Pick one to join its waitlist. If a table frees up, it is booked for you automatically.</p>');
   document.querySelectorAll('.slot:not(:disabled)').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.slot').forEach(x => x.classList.remove('sel'));
     state.slot = b.dataset.t; state.waitlist = !!b.dataset.full;
     b.classList.add('sel'); state.slotLabel = b.firstChild.textContent;
-    $('summary').innerHTML = row('Restaurant', state.resto.name) + row('Date', state.date) +
-      row('Time', state.slotLabel) + row('Party', state.party) +
-      (state.waitlist ? row('Status', 'Fully booked — you will join the waitlist') : '');
+    $('summary').textContent = state.waitlist ? 'That time is full. Confirming puts you on its waitlist.' : '';
     $('book').textContent = state.waitlist ? 'Join the waitlist' : 'Confirm reservation';
     show('pane4'); step(4); hideErr();
   }));
@@ -222,45 +215,52 @@ $('book').addEventListener('click', async () => {
     const data = await res.json();
     settled = true;
     if (!res.ok) {
-      if (data.code === 'SLOT_AVAILABLE') showErr('Good news — a table just freed up for that time. Go back and book it directly.');
-      else if (res.status === 409 && !state.waitlist) showErr('Someone just took the last table for that time — pick another slot or join its waitlist.');
-      else showErr(data.error || 'Request failed.');
+      if (data.code === 'SLOT_AVAILABLE') showErr('A table just freed up for that time. Go back and book it directly.');
+      else if (res.status === 409 && !state.waitlist) showErr('Someone just took the last table for that time. Pick another time or join its waitlist.');
+      else showErr(data.error || 'That did not go through.');
       return;
     }
     if (state.waitlist) {
       const w = data.waitlist;
-      $('doneIcon').textContent = '🕰️'; $('doneTitle').textContent = "You're on the waitlist";
-      $('doneNote').textContent = 'If a table frees up for this time, it is booked for you automatically — check My reservations.';
+      $('doneTitle').textContent = "You're on the waitlist.";
+      $('doneNote').textContent = 'If a table frees up for this time, it is booked for you automatically. Check My reservations.';
       $('doneDetail').innerHTML = row('Restaurant', w.restaurant) + row('When', w.when_local) +
-        row('Party of', w.party_size) + row('Your place in line', '#' + w.position);
+        row('Party of', w.party_size) + row('Place in line', '#' + w.position);
+      stamp(`Waitlist #${w.position}`, 'line ' + w.position);
     } else {
       const r = data.reservation;
-      $('doneIcon').textContent = '🎉'; $('doneTitle').textContent = "You're booked!"; $('doneNote').textContent = '';
-      $('doneDetail').innerHTML = row('Restaurant', `${r.restaurant} · Table ${r.table}`) +
-        row('When', r.when_local) + row('Party of', r.party_size) + row('Booked as', r.name);
+      $('doneTitle').textContent = "You're booked."; $('doneNote').textContent = 'The table is yours. Nobody else can book it for this time.';
+      $('doneDetail').innerHTML = row('Restaurant', `${r.restaurant}, table ${r.table}`) +
+        row('When', r.when_local) + row('Party of', r.party_size) + row('Name', r.name);
+      stamp('Booked', '#' + r.id.slice(0, 6));
     }
     show('pane5'); step(5);
   } catch {
     // Keep the same idempotency key: pressing Confirm again safely replays.
-    showErr('Network error — press the button again; you will not be double-booked.');
+    showErr('Network error. Press the button again; you will not be booked twice.');
   } finally {
     btn.disabled = false; btn.textContent = label;
     if (settled) state.key = newKey();
   }
 });
-$('again').addEventListener('click', () => { show('pane1'); step(1); $('book').textContent = 'Confirm reservation'; state.waitlist = false; });
+$('again').addEventListener('click', () => {
+  show('pane1'); state.slot = null; state.slotLabel = ''; state.waitlist = false;
+  $('book').textContent = 'Confirm reservation'; $('name').value = '';
+  document.querySelectorAll('.resto').forEach(x => x.classList.remove('sel'));
+  clearStamp(); step(1);
+});
 
 async function lookup() {
   const phone = $('lookupPhone').value.trim();
   if (!phone) return;
   const { reservations, waitlist = [] } = await fetch('/api/reservations?phone=' + encodeURIComponent(phone)).then(r => r.json());
   const resHtml = reservations.map(r => `
-    <div class="mine"><div><strong>${esc(r.restaurant)}</strong> · Table ${esc(r.tbl)}<small>${esc(r.when_local)} · party of ${esc(r.party_size)}</small></div>
+    <div class="mine"><div><strong>${esc(r.restaurant)}</strong><small>${esc(r.when_local)} · table ${esc(r.tbl)} · party of ${esc(r.party_size)}</small></div>
     <button class="cancel" data-kind="reservations" data-id="${esc(r.id)}">Cancel</button></div>`).join('');
   const wlHtml = waitlist.map(w => `
-    <div class="mine"><div><strong>${esc(w.restaurant)}</strong> · <span class="wl">waitlist #${esc(w.position)}</span><small>${esc(w.when_local)} · party of ${esc(w.party_size)}</small></div>
+    <div class="mine"><div><strong>${esc(w.restaurant)}</strong> <span class="wl">waitlist #${esc(w.position)}</span><small>${esc(w.when_local)} · party of ${esc(w.party_size)}</small></div>
     <button class="cancel" data-kind="waitlist" data-id="${esc(w.id)}">Leave</button></div>`).join('');
-  $('mineList').innerHTML = resHtml + wlHtml || '<p style="color:var(--muted)">No upcoming reservations for that number.</p>';
+  $('mineList').innerHTML = resHtml + wlHtml || '<p class="muted">No upcoming reservations for that number.</p>';
   document.querySelectorAll('.cancel').forEach(b => b.addEventListener('click', async () => {
     if (!confirm(b.dataset.kind === 'waitlist' ? 'Leave this waitlist?' : 'Cancel this reservation?')) return;
     await fetch(`/api/${b.dataset.kind}/${encodeURIComponent(b.dataset.id)}?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
@@ -269,6 +269,7 @@ async function lookup() {
 }
 $('lookup').addEventListener('click', lookup);
 $('lookupPhone').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+step(1);
 </script>
 </body>
 </html>
