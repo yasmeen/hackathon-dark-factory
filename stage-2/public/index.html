@@ -52,7 +52,7 @@
         <h2>Whose name is it under?</h2>
         <div class="row">
           <div class="field"><label for="name">Name</label><input id="name" placeholder="Jane Appleseed" autocomplete="name"></div>
-          <div class="field"><label for="phone">Phone</label><input id="phone" placeholder="+1 305 555 0100" autocomplete="tel"></div>
+          <div class="field"><label for="phone">Phone</label><input id="phone" type="tel" placeholder="+1 305 555 0100" autocomplete="tel"></div>
         </div>
         <p class="hint" id="summary"></p>
         <div class="actions"><button class="btn" id="book">Confirm reservation</button><button class="btn ghost" id="back3">Back</button></div>
@@ -87,7 +87,7 @@
   <div id="tab-mine" class="hidden">
     <h2>Find my reservations</h2>
     <div class="row">
-      <div class="field"><label for="lookupPhone">Phone number you booked with</label><input id="lookupPhone" placeholder="+1 305 555 0100"></div>
+      <div class="field"><label for="lookupPhone">Phone number you booked with</label><input id="lookupPhone" type="tel" autocomplete="tel" placeholder="+1 305 555 0100"></div>
     </div>
     <div class="actions"><button class="btn" id="lookup">Look up</button></div>
     <div id="mineList" style="margin-top:14px"></div>
