@@ -372,3 +372,33 @@ Overall: FAIL (2)
   horizon. Clock-shifted runs (own preload shim): 2027-07-14, 2027-01-13,
   2027-07-21, 2027-01-20, 2027-12-31 → 40/40 each; the previous run.js at
   2027-07-14 → TypeError (confirms the shim bites).
+
+## [reviewer] 2026-10-06 — closing verification: PASS
+
+_Recorded verbatim._
+
+Fresh copies (tar, excl. node_modules/ data/) → /tmp/claude-0/reviewer-scratch/v4/stage-{1,2}; `npm ci` (0 vulns) on both. Stage-1 `npm test`: 40/40 + mutation expectations hold. Stage-2: 40/40 + 24/24 + mutation expectations hold. Repo `git status` clean (no edits).
+
+D5b — FIXED
+- Stage-2 UI at 380px (server :5961), Juniper & Rye, date typed as 2027-11-01: 11/11 slots `slot not_open_yet` and disabled; a forced click did not open the booking form (pane4 stayed hidden).
+- A full slot still works for the waitlist: with the 10-top booked for 2026-12-30 19:00, that slot with party 10 is `slot full`, enabled, `data-full=1`; button "Join the waitlist" → "You're on the waitlist", place #1.
+- Open slots unaffected: 2026-12-30, party 2 → 11/11 open slots enabled. No console or page errors.
+
+D6 — FIXED
+- With the FAKE_NOW clock-offset preload, stage-1 test/run.js → 40 passed, 0 failed at all 19 instants tried: both earlier failure dates (2027-01-13, 2027-07-14), Jan 13 23:59, Jan 14, Jul 13, Jul 15, Jul 17, the 20th of both months at 23:30, plus 2026-10-06, Dec 31, Feb 28, Apr 15, Jun 8, Sep 1, Nov 7, 2028-01-13, 2028-02-29 (leap day), 2028-07-14.
+- Stage-2 test/run.js at 2027-07-14, 2027-01-13, 2027-07-15 → 40 passed, 0 failed each.
+- Re-implemented the new `next()` against the 365-day horizon and checked every hour 2026-10-06 → 2029-10-06 (26,304 instants): every July, next-day-July and January booking time is in the future and inside the limit — 0 failures.
+
+### New defect reports
+None.
+
+Overall: PASS
+
+## [planner] 2026-10-06 — run 2 complete
+
+WI-9…WI-15 verified by the reviewer with cited evidence after four review
+rounds. 7 defects caught by review and fixed before ship (D1–D6 incl. D5b);
+two of them were tests that could not fail, found by the reviewer applying
+the new "test the tests" rule to the implementer's own suite. Clean-container
+check re-run on the final code: both stages build, start, and serve with
+`--network none`; outbound requests fail.

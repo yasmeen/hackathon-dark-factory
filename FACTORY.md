@@ -121,7 +121,7 @@ What the independent reviewer did in run 2 — the review changed the product:
   refused (a side effect of the D1 fix). Round 3 confirmed D5 in the API but
   caught that the stage-2 UI still let guests click those slots (D5b), and
   that the test dates still broke on ~2 days a year (D6, found with a clock
-  shim). Both fixed. Closing verdict: see the end of `room/transcript.md`.
+  shim). Both fixed. **Round 4 (closing): PASS** — no new defects; it checked the test-date logic at every hour across three years (26,304 instants).
 
 ## Measured
 
