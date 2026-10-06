@@ -3,7 +3,7 @@
 const { startServers, call, futureDate, checker } = require('./lib');
 
 async function main() {
-  const { bases, base, stop } = await startServers({ count: 2 });
+  const { bases, base, stop } = await startServers({ count: 2, env: { TK_RACE_WINDOW_MS: '60' } });
   const { check, done } = checker();
   const D = futureDate(40);
   // Juniper & Rye has exactly one table for 10.
@@ -59,6 +59,38 @@ async function main() {
     firstCancel.json.promoted_from_waitlist && firstCancel.json.promoted_from_waitlist.name === 'Second',
     JSON.stringify(firstCancel.json));
 
+  console.log('== cancel vs. simultaneous bookers, across processes ==');
+  // The promotion must happen inside the cancel transaction: 20 bookers
+  // hammering the same table while it is cancelled must all lose.
+  const slot3 = { ...slot, time: '21:00' };
+  const o3 = await post('/api/reservations', { ...slot3, name: 'Owner3', phone: '+15550000200' });
+  await post('/api/waitlist', { ...slot3, name: 'Patient', phone: '+15550000201' });
+  const cancelP = call(bases[0], 'DELETE', `/api/reservations/${o3.json.reservation.id}?phone=%2B15550000200`);
+  const snipers = [];
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 5));
+    snipers.push(call(bases[1], 'POST', '/api/reservations', { ...slot3, name: `Sniper ${i}`, phone: `+1555009${String(i).padStart(4, '0')}` }));
+  }
+  const [c3, sn] = await Promise.all([cancelP, Promise.all(snipers)]);
+  check('during a cancel, 20 simultaneous bookers on another process all get 409; the waiting guest gets the table',
+    c3.status === 200 && c3.json.promoted_from_waitlist && c3.json.promoted_from_waitlist.name === 'Patient' &&
+    sn.every(r => r.status === 409), `cancel ${c3.status}, snipers ${sn.map(r => r.status)}`);
+
+  console.log('== promotion respects party size ==');
+  // Juniper & Rye tables fitting 6: two 6-tops and the 10-top.
+  const slot4 = { ...slot, time: '17:30', party_size: 6 };
+  const sixes = [];
+  for (let i = 0; i < 3; i++) sixes.push(await post('/api/reservations', { ...slot4, name: `Six ${i}`, phone: `+155500030${i}` }));
+  const big = await post('/api/waitlist', { ...slot4, party_size: 10, name: 'Big', phone: '+15550000310' });
+  const six = await post('/api/waitlist', { ...slot4, name: 'SixWaiting', phone: '+15550000311' });
+  const i6 = sixes.findIndex(x => x.json.reservation.table !== 'T6'); // a 6-top, not the 10-top
+  const c4 = await call(base, 'DELETE', `/api/reservations/${sixes[i6].json.reservation.id}?phone=%2B155500030${i6}`);
+  check('a freed 6-top skips the earlier party of 10 and books the waiting party of 6',
+    big.status === 201 && six.status === 201 && c4.json.promoted_from_waitlist &&
+    c4.json.promoted_from_waitlist.name === 'SixWaiting', JSON.stringify(c4.json));
+  const bigStill = await call(base, 'GET', '/api/reservations?phone=%2B15550000310');
+  check('the party of 10 is still waiting, at position 1', bigStill.json.waitlist.length === 1 && bigStill.json.waitlist[0].position === 1);
+
   console.log('== leaving the waitlist ==');
   const slot2 = { ...slot, time: '20:00' };
   const o2 = await post('/api/reservations', { ...slot2, name: 'Owner2', phone: '+15550000100' });
@@ -75,7 +107,7 @@ async function main() {
   const ov = await call(base, 'GET', '/api/admin/overview');
   check('admin overview returns stats, reservations, waitlist',
     ov.status === 200 && ov.json.stats && Array.isArray(ov.json.reservations) && Array.isArray(ov.json.waitlist));
-  check('admin counts 3 promotions from the waitlist', ov.json.stats.promoted === 3, `got ${ov.json.stats.promoted}`);
+  check('admin counts 5 promotions from the waitlist', ov.json.stats.promoted === 5, `got ${ov.json.stats.promoted}`);
   check('admin shows local times', ov.json.reservations.every(r => /[AP]M/.test(r.when_local)));
   const page = await fetch(`${base}/admin`);
   check('admin page serves', page.status === 200);

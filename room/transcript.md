@@ -205,3 +205,87 @@ Verify: in each stage, `npm ci && npm test`. Clean container:
 
 Known limitations (deliberate): single host; no guest accounts (phone is the
 key); admin open unless ADMIN_TOKEN is set.
+
+## [reviewer] 2026-10-06 — verdict on WI-9…WI-14: FAIL (4 defects)
+
+_Recorded verbatim. The reviewer ran as a separate agent with its own context,
+given only seats/reviewer.md and the WI-9…14 done-states; it verified from
+fresh copies (`npm ci`) and made no edits._
+
+Fresh copies (tar, excluding node_modules/ and data/) → /tmp/claude-0/reviewer-scratch/stage-{1,2}; `npm ci` (0 vulns). Stage-1 `npm test`: 33/33 + 4/4 mutation expectations. Stage-2 `npm test`: 33/33 + 21/21 + 4/4 mutation. Own probes ran against 2 server processes per stage sharing a scratch DB (stage-1 :5701/:5702, stage-2 :5711/:5712). Repo `git status` clean (no edits).
+
+WI-9 — PASS
+- With 8-top booked at 2026-11-20 19:00 (POST → 201): 19:15, 19:29, `19:00:00`, `9:00`, 03:00, 11:00, 22:00(closes_at) → all 400 INVALID_SLOT; 11:30 (opens_at) and 21:30 (last slot) → 201.
+- 2027-02-31, 2027-02-29 → 400 INVALID_DATE; 2028-02-29 (leap) → 201; past 2026-10-01 → 400 SLOT_IN_PAST; past check is restaurant-time (Juniper LA 2026-10-05 18:30 → 400 SLOT_IN_PAST, 22:00 → 201; availability marks 17:00–18:30 `past`).
+- Same full slot with tz=America/Los_Angeles, Asia/Tokyo, UTC → 409 SLOT_TAKEN (both stages); 18:00 tz=Asia/Tokyo stored 2026-11-20T23:00Z = 18:00 NY.
+- Test-the-test: mutants (accept off-grid time / interpret `tz` as client zone / drop past check) each made run.js FAIL.
+
+WI-10 — PASS
+- Own 50-way race across 2 procs, production config (no TK_RACE_WINDOW_MS), both stages: juniper 10-top no keys → {201:1, 409:49}; casa 8-top with keys → {201:1, 409:49}; party-7 with mixed client tz → {201:1, 409:49}. DB query: 0 (table_id,slot) pairs with >1 confirmed; no 5xx / SQLITE_BUSY in logs.
+- test/mutation.js both stages: intact 1, tx removed 1, index removed 1, both removed 4 (caught).
+- Extra mutant: tx removed AND unique-violation mapping changed to rethrow → run.js FAILS ("codes: 500,409,201"), so the backstop's 409 mapping is genuinely tested.
+
+WI-11 — PASS
+- Same key ×20 concurrently across 2 procs → all 201, 1 distinct reservation id (both stages); suite's 12-way cross-proc check passes.
+- Same key + different time/party/name/restaurant → 422 IDEMPOTENCY_KEY_REUSED; guest list shows no extra booking.
+- 10 concurrent requests sharing one fresh key but with 2 different bodies → 5×201 (same id) + 5×422; exactly 1 reservation.
+- Mutants removing the key lookup / the hash check each made run.js FAIL.
+
+WI-12 — FAIL
+- 131 malformed-input cases per stage. Clean 4xx JSON for: objects/arrays/null/numbers/bools/5000-char strings/`__proto__` in every field; party 0/-1/21/2.5/"1e1"/"0x2"; bad tz; malformed JSON; JSON null/string; 20kb body → 413; array/object query params.
+- 5 classes → 500 (both stages): dates with year 0000–0999 (availability, reservations, waitlist — RangeError: Invalid time value); unsupported Content-Encoding; corrupt gzip body; malformed percent-encoding in a path param (availability, DELETE).
+
+WI-13 — PASS (behaviour; tests weak — see defects)
+- Join with free table → 409 SLOT_AVAILABLE; join full slot → 201 positions 1,2,3; 10 concurrent joins same guest → 1×201, 9×409.
+- Party fit: Casa 6-tops+8-top held by parties of 6; Big8 waits (pos 1) then Six6 (pos 2); cancel a 6-top → Six6 promoted onto T6, Big8 skipped; cancel the 8-top → Big8 promoted.
+- Cancel-time race: 10 concurrent cancels of one reservation + 40 sniper bookings + 5 new waitlist joins, across 2 procs → cancels {200:1, 409:9}, snipers {409:40}, exactly one promotion (W0); only W0 holds the table.
+- Leave: wrong phone 404, leave 200, leave again 409, leave after promotion 409; W2 moved up to position 1.
+- UI (Playwright): full slot shows "waitlist", button "Join the waitlist" → "You're on the waitlist / #1"; My reservations shows "waitlist #1 … Leave"; Leave (dialog accepted) removes it.
+
+WI-14 — FAIL (minor)
+- XSS: names `<img src=x onerror="window.__xss=1">` and `"><svg onload=…>` render as text on confirmation, waitlist confirmation, My reservations and /admin; `window.__xss` stayed 0; no injected nodes (both stages).
+- 380px: scrollWidth = 380 at every step of the normal flow, waitlist confirmation, My reservations, /admin.
+- No console errors / page errors / failed requests in either stage's flow.
+- BUT a 30+-character unbroken guest name (API allows up to 80) makes the confirmation page scroll horizontally: 30 chars → 401px, 40 → 501px, 80 → 900px (both stages).
+
+### Adversarial probes
+- Years 1000–9999 handled without error; 9999-12-31 is bookable (201), i.e. bookings accepted millennia ahead (noted, not a done-state violation). Years 0000–0999 crash (defect 1).
+- Idempotency fingerprint ignores `tz` and treats `party_size: "2"` the same as `2` → replays original 201 (original display tz kept). Acceptable since tz is display-only.
+- Promotion with no fitting waiter leaves the table free; leaving the waitlist after being booked → 409. Held.
+- Non-ASCII / charset: `charset=utf-7`, `text/plain` bodies → clean 4xx or a normal response. Held.
+- 50-way race without fault injection: same single-winner result. Held.
+- Test-the-tests on stage-2 waitlist.js: mutants "promote newest-first" and "allow join while a table is free" were caught; "move promotion outside the cancel transaction" and "ignore party fit when promoting" SURVIVED.
+
+### Defect reports
+1. **WI-12: 500 on dates with year 0000–0999 (both stages).** Repro: `curl ':5711/api/restaurants/casa-verde/availability?date=0999-01-01&party_size=2'`; likewise POST /api/reservations or /api/waitlist with `{"restaurant_id":"casa-verde","date":"0001-01-01","time":"12:00","party_size":2,"name":"a","phone":"1"}`. Expected: 400 JSON. Observed: 500 `{"error":"internal error"}`; log `RangeError: Invalid time value at tzOffsetMs (server.js:64)` — `isValidDate` accepts these years, but `tzOffsetMs` rebuilds the date from `formatToParts`, which gives a year that isn't four digits, so `Date.parse` returns NaN.
+2. **WI-12: 500 when body-parser or the router raises a 4xx error (both stages).** Repro: POST /api/reservations with `Content-Encoding: bogus`; or `Content-Encoding: gzip` + body `notgzip`; or `GET /api/restaurants/%E0%A4%A/availability?...`; or `DELETE /api/reservations/%ZZ?phone=1`. Expected: 4xx JSON (body-parser and the router set 415/400). Observed: 500 `{"error":"internal error"}` — the final error handler only handles `entity.parse.failed` / `entity.too.large` and ignores the 4xx `err.status`.
+3. **WI-14: horizontal page scroll at 380px on the booking confirmation (both stages).** Repro: 380px viewport, book any slot with name `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA` (30 chars). Expected: no horizontal scroll. Observed: `scrollWidth` = 401 (900 with 80 chars); the `Booked as` value in `#doneDetail` doesn't wrap.
+4. **Rule 4: stage-2 test/waitlist.js does not guard two WI-13 properties.** Repro: in a copy of stage-2, (a) move `tx.commit();` before `promoted = promoteFromWaitlist(row);`, or (b) replace `AND party_size <= ?` with `AND ? > 0`; run `node test/waitlist.js`. Expected: FAIL. Observed: 21/21 PASS for both. The "nobody can grab it in between" check runs one sequential request after the cancel has finished, and every waiter in the test is a party of 10, so party fit is never exercised. The shipped code behaves correctly here (concurrent and party-fit probes above held); the gap is in the tests only.
+
+Overall: FAIL (4 defects)
+
+## [planner] 2026-10-06 — defects routed
+
+All four defects are inside WI-12/13/14's scope → back to the implementer.
+Decision D5: years outside 1970–2999 are invalid dates; bookings open at most
+365 days ahead (the reviewer's "9999-12-31 is bookable" probe — a product
+gap, not a defect, but the fix is one line and it's the same code path).
+
+## [implementer] 2026-10-06 — handoff: fixes for defects 1–4
+
+- server.js (both stages): `isValidDate` rejects years outside 1970–2999;
+  bookings > 365 days ahead → 400 TOO_FAR_AHEAD; the error handler passes
+  through any 4xx `err.status` from body-parser/router as JSON.
+- public/index.html (both), admin.html: long unbroken values wrap
+  (`overflow-wrap:anywhere`) in the confirmation, My reservations, admin.
+- test/run.js (both): +6 checks — year 0999 availability, year 0001 booking,
+  >1 year ahead, bogus Content-Encoding, corrupt gzip, bad percent-escapes.
+- stage-2 test/waitlist.js: +3 checks — a cancel racing 20 bookers on another
+  process (with TK_RACE_WINDOW_MS now also holding the cancel→promote window
+  open), and a party-fit case (freed 6-top skips an earlier party of 10).
+  Reviewer's two surviving mutants re-run against the new waitlist.js:
+  commit-before-promote → FAIL ("cancel 500, snipers 201,40…"); ignore
+  party fit → FAIL. Both now caught.
+
+Verify: `npm test` in each stage (stage-1 39 + mutation; stage-2 39 + 24 +
+mutation).

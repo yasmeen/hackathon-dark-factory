@@ -108,6 +108,20 @@ async function main() {
   check('availability for an impossible date -> 400 (not 500)', badAv.status === 400, `got ${badAv.status}`);
   const pastAv = await call(base, 'GET', `/api/restaurants/casa-verde/availability?date=${futureDate(-3)}&party_size=2`);
   check('availability marks past slots unbookable', pastAv.json.slots.every(s => s.status === 'past' && !s.available));
+  const oldYear = await call(base, 'GET', '/api/restaurants/casa-verde/availability?date=0999-01-01&party_size=2');
+  check('availability for year 0999 -> 400 (not 500)', oldYear.status === 400, `got ${oldYear.status}`);
+  await v('booking in year 0001 -> 400 (not 500)', { ...ok, date: '0001-01-01' }, 400);
+  await v('booking more than a year ahead -> 400', { ...ok, date: futureDate(400) }, 400);
+  const raw = (method, url, headers, body) => fetch(base + url, { method, headers, body })
+    .then(async r => ({ status: r.status, json: await r.json().catch(() => null) }));
+  const enc = await raw('POST', '/api/reservations', { 'Content-Type': 'application/json', 'Content-Encoding': 'bogus' }, '{}');
+  check('unsupported Content-Encoding -> 4xx JSON (not 500)', enc.status >= 400 && enc.status < 500 && enc.json, `got ${enc.status}`);
+  const gz = await raw('POST', '/api/reservations', { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' }, 'notgzip');
+  check('corrupt gzip body -> 4xx JSON (not 500)', gz.status >= 400 && gz.status < 500 && gz.json, `got ${gz.status}`);
+  const pct = await raw('DELETE', '/api/reservations/%ZZ?phone=1', {});
+  const pct2 = await raw('GET', `/api/restaurants/%E0%A4%A/availability?date=${D}&party_size=2`, {});
+  check('malformed percent-escape in the URL -> 400 (not 500)', pct.status === 400 && pct2.status === 400,
+    `got ${pct.status}/${pct2.status}`);
   const unknown = await call(base, 'GET', '/api/nope');
   check('unknown route -> 404', unknown.status === 404);
 

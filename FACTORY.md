@@ -103,17 +103,31 @@ a separate agent** with its own context, given only `seats/reviewer.md` and the
 done-states — it never saw the implementer's reasoning. Its verdict is
 recorded verbatim in `room/transcript.md`.
 
-_Run-2 reviewer verdict: pending — see the end of `room/transcript.md`._
+What the independent reviewer did in run 2 — the review changed the product:
+- **First verdict: FAIL, 4 defects.** It confirmed the headline fixes (it ran
+  its own 50-way races without fault injection, 131 malformed-input cases, a
+  cancel racing 40 bookers) and then found what the implementer missed:
+  1. dates with years 0000–0999 crashed the server (500);
+  2. bad `Content-Encoding`, corrupt gzip, and bad `%`-escapes in the URL → 500;
+  3. a 30-character unbroken guest name made the phone layout scroll sideways;
+  4. **two waitlist tests could not fail** — moving the promotion outside the
+     cancel transaction, or ignoring party size, still passed 21/21. It found
+     this by applying the new *test the tests* rule to the implementer's own
+     tests.
+- The implementer fixed all four and added checks that pin them; the
+  reviewer's two surviving mutants now fail the suite.
+- **Re-verification:** pending — see the end of `room/transcript.md`.
 
 ## Measured
 
 | Item | Measured |
 |---|---|
-| stage-1 checks | 33 passing (run-1 code against the same suite: 15 pass, 18 fail) |
-| stage-2 checks | 33 + 21 waitlist/admin passing |
+| stage-1 checks | 39 passing (run-1 code against the first 33 of them: 15 pass, 18 fail) |
+| stage-2 checks | 39 + 24 waitlist/admin passing |
 | Concurrency | 50 parallel bookings for one table across 4 processes → 1×201, 49×409 |
 | Mutation check | intact 1 winner · no transaction 1 · no unique index 1 · neither 4 — the race test can fail |
-| Test runtime | stage-1 ≈ 5 s, stage-2 ≈ 7 s (`npm test`) |
+| Test runtime | stage-1 ≈ 5 s, stage-2 ≈ 8 s (`npm test`) |
+| Run-2 review | independent reviewer: 1st verdict FAIL (4 defects) → fixed → re-verified; ~5 min, 26 tool calls for the first pass |
 | Clean container | fresh checkout → `docker build` (`npm ci`) → `docker run --network none`: UI, availability, booking, admin all 200/201; outbound request fails |
 | Runtime dependencies | 1 (express); SQLite and time zones are built into Node |
 | Model cost | not instrumented in these runs — token counts were not recorded, so we don't claim a number |

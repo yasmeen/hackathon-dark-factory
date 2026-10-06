@@ -13,7 +13,7 @@ Requires Node.js ≥ 22.5 (uses the built-in `node:sqlite`; no native modules).
 ```sh
 npm ci
 npm start         # serves http://localhost:3000 (creates + seeds the DB on first start)
-npm test          # 33 checks + mutation check, ~5 s
+npm test          # 39 checks + mutation check, ~5 s
 ```
 
 `node db.js` resets the database to the seed data.

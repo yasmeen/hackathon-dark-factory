@@ -10,7 +10,7 @@ Requires Node.js ≥ 22.5 (uses the built-in `node:sqlite`; no native modules).
 ```sh
 npm ci
 npm start         # guest UI: http://localhost:3000   admin: http://localhost:3000/admin
-npm test          # 33 booking checks + 21 waitlist/admin checks + mutation check, ~7 s
+npm test          # 39 booking checks + 24 waitlist/admin checks + mutation check, ~8 s
 ```
 
 Set `ADMIN_TOKEN=...` to lock the admin API (then open `/admin?token=...`).

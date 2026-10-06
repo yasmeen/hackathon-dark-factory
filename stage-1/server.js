@@ -45,11 +45,17 @@ const isUniqueViolation = err =>
 
 // ---------- time helpers ----------
 
+// Real calendar dates in a sane range (Intl renders years < 1000 without
+// four digits, which would break the UTC conversion below).
 function isValidDate(date) {
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const year = Number(date.slice(0, 4));
+  if (year < 1970 || year > 2999) return false;
   const d = new Date(`${date}T00:00:00Z`);
   return !isNaN(d) && d.toISOString().slice(0, 10) === date;
 }
+
+const BOOKING_HORIZON_DAYS = 365;
 
 function isValidTz(tz) {
   if (typeof tz !== 'string' || !tz) return false;
@@ -125,6 +131,8 @@ function resolveSlot(r, date, time) {
       `${r.opens_at} to ${r.closes_at}, restaurant local time (HH:MM)`, 'INVALID_SLOT');
   const utcIso = zonedTimeToUtc(date, time, r.tz).toISOString();
   if (Date.parse(utcIso) <= Date.now()) return fail(400, 'that slot has already started', 'SLOT_IN_PAST');
+  if (Date.parse(utcIso) > Date.now() + BOOKING_HORIZON_DAYS * 86400000)
+    return fail(400, `bookings open at most ${BOOKING_HORIZON_DAYS} days ahead`, 'TOO_FAR_AHEAD');
   return { utcIso };
 }
 
@@ -293,6 +301,11 @@ app.use((req, res) => res.status(404).json({ error: 'not found' }));
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'request body must be valid JSON' });
   if (err.type === 'entity.too.large') return res.status(413).json({ error: 'request body too large' });
+  // Other client errors raised by body-parser / the router (bad encoding,
+  // bad percent-escapes in the URL, ...) carry their own 4xx status.
+  const status = err.status || err.statusCode;
+  if (status >= 400 && status < 500)
+    return res.status(status).json({ error: err.expose && err.message ? err.message : 'bad request' });
   console.error(err);
   res.status(500).json({ error: 'internal error' });
 });
