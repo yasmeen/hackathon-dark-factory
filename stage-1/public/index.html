@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tablekeeper — book a table, beautifully</title>
+<title>tablekeeper — book a table</title>
 <style>
   :root { --ink:#1c1917; --muted:#78716c; --bg:#fafaf9; --card:#fff; --accent:#c2410c; --accent-d:#9a3412; --line:#e7e5e4; --ok:#15803d; }
   * { box-sizing:border-box; margin:0; }
@@ -34,6 +34,9 @@
   .slot:hover:not(:disabled) { border-color:var(--accent); }
   .slot.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
   .slot:disabled { opacity:.35; cursor:not-allowed; text-decoration:line-through; }
+  .hint { color:var(--muted); font-size:13px; margin:-4px 0 8px; }
+  .none { grid-column:1/-1; color:var(--muted); font-size:14px; margin-top:6px; }
+  .resto:focus-visible, .slot:focus-visible, .tab:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   .btn { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:14px 22px; font-size:16px; font-weight:600; cursor:pointer; width:100%; }
   .btn:hover { background:var(--accent-d); } .btn:disabled { opacity:.5; cursor:wait; }
   .btn.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
@@ -55,7 +58,7 @@
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>table<span>keeper</span></h1><p>Book a table, beautifully. Never double-booked — guaranteed.</p></div></header>
+<header><div class="wrap"><h1>table<span>keeper</span></h1><p>Book a table in seconds. One table, one party, one slot — enforced by the database.</p></div></header>
 <div class="wrap">
   <div class="tabs">
     <button class="tab sel" data-tab="book">Book a table</button>
@@ -84,7 +87,7 @@
       <button class="btn" id="toSlots">See available times</button>
     </div>
 
-    <div class="card hidden" id="pane3"><h2>Pick a time</h2><div class="slots" id="slots"></div>
+    <div class="card hidden" id="pane3"><h2>Pick a time</h2><p class="hint" id="slotHint"></p><div class="slots" id="slots"></div>
       <div style="margin-top:14px"><button class="btn ghost" id="back2">← Back</button></div>
     </div>
 
@@ -114,11 +117,18 @@
     </div>
   </div>
 </div>
-<footer>tablekeeper · stage-1 — a table is never double-booked, under concurrency, retries, or time zones.</footer>
+<footer>tablekeeper · stage-1 — no double-booking under concurrent requests, retries, or time zones.</footer>
 
 <script>
 const $ = id => document.getElementById(id);
-const state = { resto:null, date:'', party:2, slot:null, key:crypto.randomUUID() };
+// Everything the server echoes back (names, labels) is escaped before it
+// touches innerHTML — guest input must never become markup.
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+  : Date.now().toString(36) + Math.random().toString(36).slice(2);
+const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const state = { resto:null, date:'', party:2, slot:null, slotLabel:'', key:newKey() };
 const errBox = $('err');
 const showErr = m => { errBox.textContent = m; errBox.style.display = 'block'; };
 const hideErr = () => errBox.style.display = 'none';
@@ -128,6 +138,7 @@ const step = n => document.querySelectorAll('.step').forEach(s => {
   s.classList.toggle('done', k < n);
 });
 const show = id => ['pane1','pane2','pane3','pane4','pane5'].forEach(p => $(p).classList.toggle('hidden', p !== id));
+const row = (k, v) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`;
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('sel'));
@@ -138,15 +149,21 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 
 fetch('/api/restaurants').then(r => r.json()).then(({restaurants}) => {
   $('restos').innerHTML = restaurants.map(r =>
-    `<div class="resto" data-id="${r.id}"><h3>${r.name}</h3><p>${r.cuisine} · ${r.opens_at}–${r.closes_at} local</p></div>`).join('');
-  document.querySelectorAll('.resto').forEach(el => el.addEventListener('click', () => {
-    document.querySelectorAll('.resto').forEach(x => x.classList.remove('sel'));
-    el.classList.add('sel');
-    state.resto = restaurants.find(r => r.id === el.dataset.id);
-    show('pane2'); step(2); hideErr();
-    const d = new Date(); d.setDate(d.getDate() + 1);
-    $('date').value = d.toISOString().slice(0, 10);
-  }));
+    `<div class="resto" data-id="${esc(r.id)}" tabindex="0" role="button"><h3>${esc(r.name)}</h3>
+     <p>${esc(r.cuisine)} · ${esc(r.opens_at)}–${esc(r.closes_at)} · ${esc(r.tz.split('/').pop().replace(/_/g, ' '))} time</p></div>`).join('');
+  document.querySelectorAll('.resto').forEach(el => {
+    const pick = () => {
+      document.querySelectorAll('.resto').forEach(x => x.classList.remove('sel'));
+      el.classList.add('sel');
+      state.resto = restaurants.find(r => r.id === el.dataset.id);
+      show('pane2'); step(2); hideErr();
+      const d = new Date(); d.setDate(d.getDate() + 1);
+      $('date').value = localDate(d);
+      $('date').min = localDate(new Date());
+    };
+    el.addEventListener('click', pick);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+  });
 });
 
 $('toSlots').addEventListener('click', async () => {
@@ -154,21 +171,21 @@ $('toSlots').addEventListener('click', async () => {
   state.date = $('date').value; state.party = +$('party').value;
   if (!state.date) return showErr('Pick a date first.');
   const q = new URLSearchParams({ date: state.date, party_size: state.party });
-  const res = await fetch(`/api/restaurants/${state.resto.id}/availability?${q}`);
+  const res = await fetch(`/api/restaurants/${encodeURIComponent(state.resto.id)}/availability?${q}`);
   const { slots, error } = await res.json();
   if (error) return showErr(error);
-  const avail = slots.filter(s => s.available);
+  $('slotHint').textContent = `Times are local to ${state.resto.name} (${state.resto.tz.replace(/_/g, ' ')}).`;
   $('slots').innerHTML = slots.map(s =>
-    `<button class="slot" ${s.available ? '' : 'disabled'} data-t="${s.time}">${s.display_time}</button>`).join('')
+    `<button class="slot ${esc(s.status)}" ${s.available ? '' : 'disabled'} data-t="${esc(s.time)}"
+       title="${s.status === 'full' ? 'Fully booked' : s.status === 'past' ? 'Already started' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}</button>`).join('')
     || '<p style="color:var(--muted)">No availability that day.</p>';
+  if (slots.length && !slots.some(s => s.available))
+    $('slots').insertAdjacentHTML('beforeend', '<p class="none">Nothing free that day for this party size — try another date.</p>');
   document.querySelectorAll('.slot:not(:disabled)').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.slot').forEach(x => x.classList.remove('sel'));
-    b.classList.add('sel'); state.slot = b.dataset.t;
-    $('summary').innerHTML = `
-      <div><span>Restaurant</span><span>${state.resto.name}</span></div>
-      <div><span>Date</span><span>${state.date}</span></div>
-      <div><span>Time</span><span>${b.textContent}</span></div>
-      <div><span>Party</span><span>${state.party}</span></div>`;
+    b.classList.add('sel'); state.slot = b.dataset.t; state.slotLabel = b.textContent;
+    $('summary').innerHTML = row('Restaurant', state.resto.name) + row('Date', state.date) +
+      row('Time', b.textContent) + row('Party', state.party);
     show('pane4'); step(4); hideErr();
   }));
   show('pane3'); step(3);
@@ -181,6 +198,7 @@ $('book').addEventListener('click', async () => {
   const name = $('name').value.trim(), phone = $('phone').value.trim();
   if (!name || !phone) return showErr('Name and phone are required.');
   const btn = $('book'); btn.disabled = true; btn.textContent = 'Booking…';
+  let settled = false;
   try {
     const res = await fetch('/api/reservations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -188,33 +206,41 @@ $('book').addEventListener('click', async () => {
         party_size: state.party, name, phone, idempotency_key: state.key }),
     });
     const data = await res.json();
-    if (!res.ok) { showErr(data.error || 'Booking failed.'); return; }
+    settled = true;
+    if (!res.ok) {
+      showErr(res.status === 409 ? 'Someone just took the last table for that time — pick another slot.' : (data.error || 'Booking failed.'));
+      return;
+    }
     const r = data.reservation;
-    $('doneDetail').innerHTML = `
-      <div><span>Restaurant</span><span>${r.restaurant} · Table ${r.table}</span></div>
-      <div><span>When</span><span>${r.when_local}</span></div>
-      <div><span>Party of</span><span>${r.party_size}</span></div>
-      <div><span>Booked as</span><span>${r.name}</span></div>`;
-    show('pane5'); step(4);
-  } catch { showErr('Network error — your booking may have gone through; check My reservations before retrying.'); }
-  finally { btn.disabled = false; btn.textContent = 'Confirm reservation'; state.key = crypto.randomUUID(); }
+    $('doneDetail').innerHTML = row('Restaurant', `${r.restaurant} · Table ${r.table}`) +
+      row('When', r.when_local) + row('Party of', r.party_size) + row('Booked as', r.name);
+    show('pane5'); step(5);
+  } catch {
+    // Keep the same idempotency key: pressing Confirm again safely replays.
+    showErr('Network error — press Confirm again; you will not be double-booked.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirm reservation';
+    if (settled) state.key = newKey();
+  }
 });
 $('again').addEventListener('click', () => { show('pane1'); step(1); });
 
-$('lookup').addEventListener('click', async () => {
+async function lookup() {
   const phone = $('lookupPhone').value.trim();
   if (!phone) return;
   const { reservations } = await fetch('/api/reservations?phone=' + encodeURIComponent(phone)).then(r => r.json());
   $('mineList').innerHTML = reservations.length ? reservations.map(r => `
-    <div class="mine"><div><strong>${r.restaurant}</strong> · Table ${r.tbl}<small>${r.when_local} · party of ${r.party_size}</small></div>
-    <button class="cancel" data-id="${r.id}">Cancel</button></div>`).join('')
+    <div class="mine"><div><strong>${esc(r.restaurant)}</strong> · Table ${esc(r.tbl)}<small>${esc(r.when_local)} · party of ${esc(r.party_size)}</small></div>
+    <button class="cancel" data-id="${esc(r.id)}">Cancel</button></div>`).join('')
     : '<p style="color:var(--muted)">No upcoming reservations for that number.</p>';
   document.querySelectorAll('.cancel').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Cancel this reservation?')) return;
-    await fetch(`/api/reservations/${b.dataset.id}?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
-    $('lookup').click();
+    await fetch(`/api/reservations/${encodeURIComponent(b.dataset.id)}?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
+    lookup();
   }));
-});
+}
+$('lookup').addEventListener('click', lookup);
+$('lookupPhone').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
 </script>
 </body>
 </html>

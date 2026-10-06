@@ -1,104 +1,133 @@
-// Tablekeeper stage-1 — verification suite (reviewer seat evidence).
-// Spins up the service against a scratch database and probes the hard parts:
-// concurrency, retried requests, time zones, validation. Run: npm test
+// Tablekeeper — verification suite (reviewer seat evidence).
+// Starts the real service (4 processes sharing one scratch database) and
+// probes the hard parts: concurrency, retried requests, off-grid and
+// cross-timezone overlaps, DST, validation, cancel. Run: npm test
+//
+// TK_RACE_WINDOW_MS holds the check→insert gap open so the race test can
+// actually fail; test/mutation.js proves it does when protections are removed.
 
-const { spawn } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tablekeeper-test-'));
-const DB_PATH = path.join(tmp, 'test.db');
-const PORT = 4123;
-const BASE = `http://127.0.0.1:${PORT}`;
-
-let pass = 0, fail = 0;
-function check(name, cond, detail = '') {
-  if (cond) { pass++; console.log(`  PASS  ${name}`); }
-  else { fail++; console.log(`  FAIL  ${name} ${detail}`); }
-}
+const { startServers, call, race, futureDate, checker } = require('./lib');
 
 async function main() {
-  const server = spawn('node', ['server.js'], {
-    cwd: path.join(__dirname, '..'), env: { ...process.env, DB_PATH, PORT: String(PORT) },
-    stdio: 'ignore',
-  });
-  const kill = () => { try { server.kill('SIGKILL'); } catch {} };
-  process.on('exit', kill);
+  const { bases, base, stop } = await startServers({ count: 4, env: { TK_RACE_WINDOW_MS: '40' } });
+  const { check, done } = checker();
+  const post = body => call(base, 'POST', '/api/reservations', body);
+  const D = futureDate(30);
+  const guest = { name: 'Test Guest', phone: '+15550001111' };
 
-  // wait for readiness
-  for (let i = 0; i < 50; i++) {
-    try { const r = await fetch(`${BASE}/api/restaurants`); if (r.ok) break; } catch {}
-    await new Promise(r => setTimeout(r, 200));
-  }
+  console.log('== concurrency: 50 parallel bookings for one table, across 4 processes ==');
+  // Party of 8 -> only Casa Verde's single 8-top qualifies.
+  const slot = { restaurant_id: 'casa-verde', date: D, time: '19:00', party_size: 8 };
+  const codes = await race(bases, slot);
+  check('exactly 1 of 50 parallel bookings wins', codes.filter(c => c === 201).length === 1,
+    `got ${codes.filter(c => c === 201).length}`);
+  check('other 49 are rejected with 409', codes.filter(c => c === 409).length === 49,
+    `codes: ${[...new Set(codes)]}`);
+  const avFull = await call(base, 'GET', `/api/restaurants/casa-verde/availability?date=${D}&party_size=8`);
+  const s1900 = avFull.json.slots.find(s => s.time === '19:00');
+  check('slot shows full for that party afterwards', s1900 && s1900.status === 'full' && !s1900.available);
 
-  const post = (body) => fetch(`${BASE}/api/reservations`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).then(async r => ({ status: r.status, json: await r.json() }));
-
-  console.log('== concurrency: 50 parallel bookings, same table slot ==');
-  const slot = { restaurant_id: 'casa-verde', date: '2026-10-20', time: '19:00',
-    party_size: 8, name: 'Load Test', phone: '+10000000000', tz: 'America/New_York' };
-  // party of 8 -> only the single 8-top at Casa Verde qualifies, so all 50
-  // requests contend for exactly one table.
-  const results = await Promise.all(Array.from({ length: 50 }, (_, i) =>
-    post({ ...slot, phone: `+100000000${String(i).padStart(2, '0')}`, idempotency_key: `race-${i}` })));
-  const wins = results.filter(r => r.status === 201);
-  const rejects = results.filter(r => r.status === 409);
-  check('exactly 1 of 50 parallel bookings wins', wins.length === 1, `got ${wins.length}`);
-  check('other 49 are rejected with 409', rejects.length === 49, `got ${rejects.length}`);
+  console.log('== no overlap through the side door ==');
+  const off = await post({ ...slot, time: '19:15', ...guest });
+  check('off-grid start (19:15) is rejected, so it cannot overlap 19:00', off.status === 400 && off.json.code === 'INVALID_SLOT',
+    `got ${off.status}`);
+  const closed = await post({ ...slot, time: '03:00', ...guest });
+  check('start outside opening hours is rejected', closed.status === 400, `got ${closed.status}`);
+  const lastSlot = await post({ ...slot, time: '22:00', ...guest });
+  check('closing time itself is not a slot start', lastSlot.status === 400, `got ${lastSlot.status}`);
+  const otherTz = await post({ ...slot, tz: 'America/Los_Angeles', ...guest });
+  check('client tz does not move the booking: same 8-top slot from LA -> 409', otherTz.status === 409,
+    `got ${otherTz.status}`);
 
   console.log('== retries: idempotency key ==');
   const key = 'idem-' + Date.now();
-  const first = await post({ ...slot, date: '2026-10-21', time: '19:00', party_size: 2, idempotency_key: key });
-  const retry = await post({ ...slot, date: '2026-10-21', time: '19:00', party_size: 2, idempotency_key: key });
+  const req = { restaurant_id: 'casa-verde', date: D, time: '18:00', party_size: 2, ...guest, idempotency_key: key };
+  const first = await post(req);
+  const retry = await post(req);
   check('first request books (201)', first.status === 201, `got ${first.status}`);
-  check('retry returns same reservation, no duplicate',
-    retry.status === 201 && retry.json.reservation.id === first.json.reservation.id,
-    `got ${retry.status}`);
-  const mine = await fetch(`${BASE}/api/reservations?phone=${encodeURIComponent('+10000000000')}`).then(r => r.json());
-  check('no duplicate rows created by retry',
-    mine.reservations.filter(x => x.when_local.includes('Oct')).length <= 2, JSON.stringify(mine.reservations.length));
+  check('retry returns the same reservation and is marked as a replay',
+    retry.status === 201 && retry.json.reservation.id === first.json.reservation.id &&
+    retry.headers.get('idempotent-replay') === 'true', `got ${retry.status}`);
+  const reused = await post({ ...req, time: '18:30' });
+  check('same key with a different request -> 422, nothing booked', reused.status === 422, `got ${reused.status}`);
+  const k2 = 'idem-par-' + Date.now();
+  const dup = await Promise.all(bases.flatMap(b => [0, 1, 2].map(() =>
+    call(b, 'POST', '/api/reservations', { ...req, time: '20:00', idempotency_key: k2 }))));
+  const ids = new Set(dup.map(d => d.json && d.json.reservation && d.json.reservation.id));
+  check('12 simultaneous retries of one request across processes -> one reservation',
+    dup.every(d => d.status === 201) && ids.size === 1, `statuses ${dup.map(d => d.status)} ids ${ids.size}`);
+  const mine = await call(base, 'GET', `/api/reservations?phone=${encodeURIComponent(guest.phone)}`);
+  check('guest has exactly the 2 bookings made (18:00, 20:00), no duplicates',
+    mine.json.reservations.length === 2, `got ${mine.json.reservations.length}`);
 
-  console.log('== time zones ==');
-  const tzb = await post({ restaurant_id: 'casa-verde', date: '2026-10-20', time: '19:00',
-    party_size: 2, name: 'TZ Test', phone: '+12223334444', tz: 'America/New_York', idempotency_key: 'tz-1' });
-  // Oct 20 2026: New York is on EDT (UTC-4) -> 19:00 local = 23:00 UTC
-  check('19:00 America/New_York stored as 23:00 UTC',
-    tzb.json.reservation.slot_start_utc === '2026-10-20T23:00:00.000Z',
-    `got ${tzb.json.reservation && tzb.json.reservation.slot_start_utc}`);
-  const av = await fetch(`${BASE}/api/restaurants/copper-kettle/availability?date=2026-10-20&party_size=2&tz=America/New_York`).then(r => r.json());
-  const noon = av.slots.find(s => s.time === '12:00');
-  // Chicago 12:00 CDT (UTC-5) viewed from New York = 1:00 PM EDT
-  check('cross-timezone display shifts correctly',
-    noon && noon.display_time === '1:00 PM', `got ${noon && noon.display_time}`);
+  console.log('== time zones & DST ==');
+  const tzb = await post({ restaurant_id: 'casa-verde', date: '2027-07-15', time: '19:00', party_size: 2, ...guest });
+  check('19:00 America/New_York in July stored as 23:00 UTC (EDT)',
+    tzb.json && tzb.json.reservation.slot_start_utc === '2027-07-15T23:00:00.000Z',
+    `got ${tzb.json && tzb.json.reservation && tzb.json.reservation.slot_start_utc}`);
+  const win = await post({ restaurant_id: 'casa-verde', date: '2027-01-15', time: '19:00', party_size: 2, ...guest });
+  check('19:00 America/New_York in January stored as 00:00 UTC next day (EST)',
+    win.json && win.json.reservation.slot_start_utc === '2027-01-16T00:00:00.000Z',
+    `got ${win.json && win.json.reservation && win.json.reservation.slot_start_utc}`);
+  const shown = await post({ restaurant_id: 'casa-verde', date: '2027-07-16', time: '19:00', party_size: 2,
+    tz: 'America/Los_Angeles', ...guest });
+  check('client tz only changes display: NY 19:00 shown as 4:00 PM PDT',
+    shown.json && shown.json.reservation.slot_start_utc === '2027-07-16T23:00:00.000Z' &&
+    /4:00\s?PM PDT/.test(shown.json.reservation.when_local), JSON.stringify(shown.json));
+  const av = await call(base, 'GET', '/api/restaurants/copper-kettle/availability?date=2027-07-15&party_size=2&tz=America/New_York');
+  const noon = av.json.slots.find(s => s.time === '12:00');
+  check('Chicago 12:00 viewed from New York shows 1:00 PM', noon && noon.display_time === '1:00 PM',
+    `got ${noon && noon.display_time}`);
+  for (const [day, firstUtc, label] of [['2027-11-07', '2027-11-07T16:30:00.000Z', 'fall-back'],
+                                        ['2027-03-14', '2027-03-14T15:30:00.000Z', 'spring-forward']]) {
+    const a = await call(base, 'GET', `/api/restaurants/casa-verde/availability?date=${day}&party_size=2`);
+    const utcs = a.json.slots.map(s => Date.parse(s.utc));
+    const evenly = utcs.every((u, i) => i === 0 || u - utcs[i - 1] === 30 * 60000);
+    check(`DST ${label} day: 21 slots, each exactly once, 30 min apart, first at 11:30 local`,
+      utcs.length === 21 && new Set(utcs).size === 21 && evenly && a.json.slots[0].utc === firstUtc,
+      `n=${utcs.length} first=${a.json.slots[0] && a.json.slots[0].utc}`);
+  }
 
-  console.log('== validation & availability ==');
-  const bad1 = await post({ ...slot, date: 'not-a-date' });
-  check('bad date -> 400', bad1.status === 400, `got ${bad1.status}`);
-  const bad2 = await post({ ...slot, restaurant_id: 'nope' });
-  check('unknown restaurant -> 404', bad2.status === 404, `got ${bad2.status}`);
-  const bad3 = await post({ ...slot, tz: 'Mars/Olympus' });
-  check('bad timezone -> 400', bad3.status === 400, `got ${bad3.status}`);
-  const av2 = await fetch(`${BASE}/api/restaurants/casa-verde/availability?date=2026-10-20&party_size=8`).then(r => r.json());
-  const s1900 = av2.slots.find(s => s.time === '19:00');
-  check('slot shows unavailable after the 8-top is taken', s1900 && s1900.available === false);
+  console.log('== validation ==');
+  const v = async (name, body, want) => {
+    const r = await post(body);
+    check(name, r.status === want && r.json && r.json.error, `got ${r.status}`);
+  };
+  const ok = { restaurant_id: 'casa-verde', date: D, time: '12:00', party_size: 2, ...guest };
+  await v('impossible date (Feb 31) -> 400', { ...ok, date: '2027-02-31' }, 400);
+  await v('slot in the past -> 400', { ...ok, date: futureDate(-3) }, 400);
+  await v('unknown restaurant -> 404', { ...ok, restaurant_id: 'nope' }, 404);
+  await v('bad timezone -> 400', { ...ok, tz: 'Mars/Olympus' }, 400);
+  await v('party_size "8abc" -> 400', { ...ok, party_size: '8abc' }, 400);
+  await v('name sent as an object -> 400 (not 500)', { ...ok, name: { a: 1 } }, 400);
+  await v('idempotency_key sent as an object -> 400 (not 500)', { ...ok, idempotency_key: { a: 1 } }, 400);
+  const badJson = await call(base, 'POST', '/api/reservations', '{not json');
+  check('malformed JSON body -> 400 JSON error', badJson.status === 400 && badJson.json && badJson.json.error,
+    `got ${badJson.status}`);
+  const badAv = await call(base, 'GET', '/api/restaurants/casa-verde/availability?date=2027-13-45&party_size=2');
+  check('availability for an impossible date -> 400 (not 500)', badAv.status === 400, `got ${badAv.status}`);
+  const pastAv = await call(base, 'GET', `/api/restaurants/casa-verde/availability?date=${futureDate(-3)}&party_size=2`);
+  check('availability marks past slots unbookable', pastAv.json.slots.every(s => s.status === 'past' && !s.available));
+  const unknown = await call(base, 'GET', '/api/nope');
+  check('unknown route -> 404', unknown.status === 404);
 
   console.log('== cancel frees the table ==');
-  const cb = await post({ restaurant_id: 'juniper-rye', date: '2026-10-22', time: '19:00',
-    party_size: 10, name: 'Cancel Me', phone: '+13334445555', idempotency_key: 'cancel-1' });
+  const cb = await post({ restaurant_id: 'juniper-rye', date: D, time: '19:00', party_size: 10,
+    name: 'Cancel Me', phone: '+13334445555' });
   const cid = cb.json.reservation.id;
-  const del = await fetch(`${BASE}/api/reservations/${cid}?phone=%2B13334445555`, { method: 'DELETE' });
+  const wrong = await call(base, 'DELETE', `/api/reservations/${cid}?phone=%2B19999999999`);
+  check('cancel with the wrong phone -> 404', wrong.status === 404, `got ${wrong.status}`);
+  const del = await call(base, 'DELETE', `/api/reservations/${cid}?phone=%2B13334445555`);
   check('cancel returns 200', del.status === 200, `got ${del.status}`);
-  const rebook = await post({ restaurant_id: 'juniper-rye', date: '2026-10-22', time: '19:00',
-    party_size: 10, name: 'Rebook', phone: '+14445556666', idempotency_key: 'cancel-2' });
+  const again = await call(base, 'DELETE', `/api/reservations/${cid}?phone=%2B13334445555`);
+  check('cancelling twice -> 409, nothing else changes', again.status === 409, `got ${again.status}`);
+  const rebook = await post({ restaurant_id: 'juniper-rye', date: D, time: '19:00', party_size: 10,
+    name: 'Rebook', phone: '+14445556666' });
   check('table can be rebooked after cancel', rebook.status === 201, `got ${rebook.status}`);
 
-  console.log(`\n${pass} passed, ${fail} failed`);
-  kill();
-  fs.rmSync(tmp, { recursive: true, force: true });
-  process.exit(fail ? 1 : 0);
+  const failed = done();
+  stop();
+  process.exit(failed ? 1 : 0);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

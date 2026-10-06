@@ -1,60 +1,68 @@
 # tablekeeper — stage-2
 
-A restaurant reservation service where **a table is never double-booked** —
-under concurrent requests, retried requests, and across time zones.
+Stage-1 (a restaurant reservation service where **a table is never
+double-booked**) plus a **waitlist** and an **admin dashboard**.
 
 ## Run
 
+Requires Node.js ≥ 22.5 (uses the built-in `node:sqlite`; no native modules).
+
 ```sh
-npm install
-node db.js        # create + seed the database
-npm start         # serves on :3000
+npm ci
+npm start         # guest UI: http://localhost:3000   admin: http://localhost:3000/admin
+npm test          # 33 booking checks + 21 waitlist/admin checks + mutation check, ~7 s
 ```
 
-## How the no-double-booking guarantee works
+Set `ADMIN_TOKEN=...` to lock the admin API (then open `/admin?token=...`).
+Unset, the dashboard is open — fine for a local demo, not for production.
 
-1. **Atomic check-and-book.** Every booking runs inside one `BEGIN IMMEDIATE`
-   SQLite transaction: find a free table → insert the reservation → commit.
-   The write lock is taken up front, so two concurrent requests cannot both
-   observe a free table.
-2. **Database backstop.** A partial `UNIQUE` index on
-   `(table_id, slot_start_utc) WHERE status='confirmed'` rejects any
-   double-insert that slipped past the check (e.g. a cross-process race) —
-   the API maps it to HTTP 409.
-3. **Idempotent retries.** Clients send `idempotency_key`; a repeated request
-   returns the stored result instead of creating a second reservation.
-4. **Time zones.** All instants are stored as UTC; conversion happens at the
-   edge with IANA timezone names. Availability is computed per restaurant in
-   its local timezone.
+## What stage-2 adds
 
-## API
+**Waitlist that actually holds the table.**
+- A guest can join a slot's waitlist only when it is full for their party
+  (in the UI: dashed "waitlist" times). They see their place in line under
+  *My reservations* and can leave.
+- When a booking is cancelled, the oldest waiting guest whose party fits the
+  freed table is **booked onto it in the same transaction**. The table is
+  never free in between, so nobody can grab it first, and it can't be given
+  out twice.
+- Cancelling an already-cancelled booking returns 409 and promotes nobody.
+
+**Admin dashboard** (`/admin`): upcoming reservations and waitlist in each
+restaurant's local time, bookings that came from the waitlist, and counts
+(upcoming, waiting, promoted, cancelled). Usable on a phone.
+
+## No double-booking
+
+Same guarantees as stage-1 — see `../stage-1/README.md` for the full
+explanation and the mutation table. In short: bookings only on the slot grid
+in restaurant time; one `BEGIN IMMEDIATE` transaction per booking; a partial
+`UNIQUE` index as backstop; idempotency keys stored in the same transaction.
+`npm test` runs the 50-way race across 4 processes and proves, by removing
+the protections, that the race test can fail.
+
+## API (stage-2 additions)
 
 | Method | Route | Notes |
 |---|---|---|
-| GET | /api/restaurants | list restaurants |
-| GET | /api/restaurants/:id/availability?date=YYYY-MM-DD&party_size=N&tz=IANA | slots, 200/400/404 |
-| POST | /api/reservations | 201 booked / 409 slot taken / 400 bad input |
-| GET | /api/reservations?phone=... | guest's upcoming reservations |
-| DELETE | /api/reservations/:id?phone=... | cancel (frees the table) |
+| POST | /api/waitlist | `{ restaurant_id, date, time, party_size, name, phone }` → 201 with position · 409 if a table is free or already waiting |
+| DELETE | /api/waitlist/:id?phone=... | leave the waitlist |
+| GET | /api/reservations?phone=... | now also returns `waitlist` entries with position |
+| DELETE | /api/reservations/:id?phone=... | response includes `promoted_from_waitlist` |
+| GET | /admin, /api/admin/overview | dashboard + JSON (`ADMIN_TOKEN` optional) |
 
-`POST /api/reservations` body:
-`{ restaurant_id, date, time, party_size, name, phone, tz?, idempotency_key? }`
-
-## Verify
-
-```sh
-npm test   # concurrency (50 parallel same-slot bookings -> exactly 1 wins),
-           # idempotent retry, timezone, and validation probes
-```
+Everything in the stage-1 API is unchanged.
 
 ## Clean container
 
 ```sh
-docker build -t tablekeeper:stage-1 .
-docker run --rm -p 3000:3000 --network none tablekeeper:stage-1
+docker build -t tablekeeper:stage-2 .
+# prove it runs with no network at all, then probe it from inside:
+docker run -d --name tk --network none tablekeeper:stage-2
+docker exec tk node -e "fetch('http://127.0.0.1:3000/healthz').then(r=>console.log(r.status))"   # 200
+docker rm -f tk
+# to use it from your browser, publish the port instead:
+docker run --rm -p 3000:3000 tablekeeper:stage-2
 ```
 
-The image builds with `npm ci` and the service runs with **no outbound
-network** (`--network none`): every dependency is vendored at build time and
-all data is local SQLite. Timezone conversion uses the Node.js `Intl` API —
-no external tz database download.
+No outbound network needed at runtime.
