@@ -8,12 +8,16 @@
 
 const { startServers, call, race, futureDate, checker } = require('./lib');
 
-// Next future occurrence of a month-day (always within the 365-day horizon),
-// so the suite keeps working as the calendar moves on.
-function next(mmdd) {
+// A bookable date in a given month (3–360 days ahead, inside the booking
+// horizon), so the suite keeps working on any day of the year.
+function next(mm) {
   const y = new Date().getUTCFullYear();
-  const d = `${y}-${mmdd}`;
-  return Date.parse(d) > Date.now() + 2 * 86400000 ? d : `${y + 1}-${mmdd}`;
+  for (const year of [y, y + 1]) for (let day = 10; day <= 20; day++) {
+    const d = `${year}-${mm}-${String(day).padStart(2, '0')}`;
+    const ahead = Date.parse(d) - Date.now();
+    if (ahead > 3 * 86400000 && ahead < 360 * 86400000) return d;
+  }
+  throw new Error(`no bookable date in month ${mm}`);
 }
 const dayAfter = d => new Date(Date.parse(d) + 86400000).toISOString().slice(0, 10);
 
@@ -70,7 +74,7 @@ async function main() {
     mine.json.reservations.length === 2, `got ${mine.json.reservations.length}`);
 
   console.log('== time zones & DST ==');
-  const JUL = next('07-15'), JUL2 = next('07-16'), JAN = next('01-15');
+  const JUL = next('07'), JUL2 = dayAfter(JUL), JAN = next('01');
   const tzb = await post({ restaurant_id: 'casa-verde', date: JUL, time: '19:00', party_size: 2, ...guest });
   check('19:00 America/New_York in July stored as 23:00 UTC (EDT)',
     tzb.json && tzb.json.reservation.slot_start_utc === `${JUL}T23:00:00.000Z`,

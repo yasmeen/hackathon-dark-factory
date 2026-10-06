@@ -338,3 +338,37 @@ Overall: FAIL (1 defect)
   occurrence of each date, so the suite no longer expires.
 
 Verify: `npm test` (stage-1 40 + mutation; stage-2 40 + 24 + mutation).
+
+## [reviewer] 2026-10-06 — final verification: D5 FIXED (API, stage-1), 2 new defects
+
+_Recorded verbatim._
+
+Fresh copies (tar, excl. node_modules/ data/) → /tmp/claude-0/reviewer-scratch/v3/stage-{1,2}; `npm ci` (0 vulns) on both. Stage-1 `npm test`: 40/40 + mutation expectations hold. Stage-2: 40/40 + 24/24 + mutation expectations hold. Probes against 2 server processes per stage sharing a scratch DB (stage-1 :5901/:5902, stage-2 :5911/:5912). Repo `git status` clean (no edits).
+
+D5 — FIXED in the API and in stage-1; NOT FIXED in the stage-2 guest UI.
+- D5 repro: `GET /api/restaurants/casa-verde/availability?date=2027-11-01&party_size=2` → 12:00 `{"available":false,"tables_available":0,"status":"not_open_yet"}` on both stages.
+- Availability vs. booking: compared on 2027-10-05, 2027-10-06, 2027-10-07, 2027-11-01, 32 slots per stage → 0 mismatches (every slot marked available booked 201; every `not_open_yet` slot refused). 2027-10-05 shows 21 open; 2027-10-06 onward shows 21 not_open_yet.
+- Date picker: `max="2027-10-05"` (and `min="2026-10-06"`) on both stages.
+- Rule 4: mutant reverting the availability fix (`closed = past`, no `not_open_yet`) → the new check "availability shows slots beyond the booking horizon as not bookable" FAILS on both stages.
+- Stage-2 UI gap: `max` doesn't stop a typed date, and nothing else blocks these slots. With 2027-11-01 typed, 0/21 slots disabled; the 12:00 button is `class="slot not_open_yet"`, enabled; Confirm then fails with "bookings open at most 365 days ahead". Stage-1 disables 21/21.
+
+Spot-checks — all held:
+- 50-way race across 2 processes, 3 scenarios per stage → {201:1, 409:49} each.
+- Stage-2 waitlist: Six6 promoted past non-fitting Big8; 10 concurrent cancels + 40 snipers + 5 joins → cancels one 200 + 9×409, snipers 40×409, exactly one promotion (W0); leave 404 → 200 → 409.
+- UI 380px: scrollWidth 380, no page errors.
+
+### New defect reports
+1. **D5b: stage-2 guest UI lets guests pick slots that are not open yet.** Repro: stage-2 `/` → Casa Verde → type 2027-11-01 → "See available times" → click 12:00 → name/phone → Confirm. Expected: `not_open_yet` slots disabled (as in stage-1). Observed: every slot clickable; Confirm fails with "bookings open at most 365 days ahead". Stage-2 disables only `past` slots, because it deliberately leaves full slots clickable for the waitlist.
+2. **D6: the dated-test fix still fails ~2 days twice a year (test/run.js, both stages).** `next()` jumps to the following year whenever the month-day is within 2 days; that date sits ~366–367 days ahead, beyond the 365-day horizon → 400 TOO_FAR_AHEAD. Repro with a clock-offset preload (`/tmp/claude-0/reviewer-scratch/shim/fake-now.js` via `NODE_OPTIONS=--require`, inherited by spawned servers): `FAKE_NOW=2027-07-14T12:00:00Z node test/run.js` → `TypeError: Cannot read properties of undefined (reading 'slot_start_utc') at run.js:76`; same for `FAKE_NOW=2027-01-13T12:00:00Z`. Control `FAKE_NOW=2027-03-01T12:00:00Z` → 40 passed, 0 failed. Simulating `next()` against the horizon: failure windows ~Jan 13–14 and Jul 13–15 every year. Expected: the suite passes on any day.
+
+Overall: FAIL (2)
+
+## [implementer] 2026-10-06 — handoff: D5b + D6
+
+- stage-2 public/index.html: slots with status `not_open_yet` are disabled
+  (full slots stay clickable for the waitlist).
+- test/run.js (both): `next(month)` now picks a day 10–20 of the month that
+  is 3–360 days ahead (this year or next), so it is always inside the
+  horizon. Clock-shifted runs (own preload shim): 2027-07-14, 2027-01-13,
+  2027-07-21, 2027-01-20, 2027-12-31 → 40/40 each; the previous run.js at
+  2027-07-14 → TypeError (confirms the shim bites).

@@ -186,7 +186,7 @@ $('toSlots').addEventListener('click', async () => {
   if (error) return showErr(error);
   $('slotHint').textContent = `Times are local to ${state.resto.name} (${state.resto.tz.replace(/_/g, ' ')}).`;
   $('slots').innerHTML = slots.map(s =>
-    `<button class="slot ${esc(s.status)}" ${s.status === 'past' ? 'disabled' : ''} data-t="${esc(s.time)}" data-full="${s.status === 'full' ? 1 : ''}"
+    `<button class="slot ${esc(s.status)}" ${s.status === 'past' || s.status === 'not_open_yet' ? 'disabled' : ''} data-t="${esc(s.time)}" data-full="${s.status === 'full' ? 1 : ''}"
        title="${s.status === 'full' ? 'Fully booked — join the waitlist' : s.status === 'past' ? 'Already started' : s.status === 'not_open_yet' ? 'Bookings open 365 days ahead' : esc(s.tables_available) + ' table(s) free'}">${esc(s.display_time)}${s.status === 'full' ? '<br><span class="wl">waitlist</span>' : ''}</button>`).join('')
     || '<p style="color:var(--muted)">No availability that day.</p>';
   if (slots.some(s => s.status === 'full'))
