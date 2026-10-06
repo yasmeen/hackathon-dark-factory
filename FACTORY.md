@@ -116,7 +116,12 @@ What the independent reviewer did in run 2 — the review changed the product:
      tests.
 - The implementer fixed all four and added checks that pin them; the
   reviewer's two surviving mutants now fail the suite.
-- **Re-verification:** pending — see the end of `room/transcript.md`.
+- **Re-verification rounds.** Round 2 confirmed D1–D4 fixed and found D5:
+  availability offered slots more than a year ahead that booking then
+  refused (a side effect of the D1 fix). Round 3 confirmed D5 in the API but
+  caught that the stage-2 UI still let guests click those slots (D5b), and
+  that the test dates still broke on ~2 days a year (D6, found with a clock
+  shim). Both fixed. Closing verdict: see the end of `room/transcript.md`.
 
 ## Measured
 
@@ -127,7 +132,7 @@ What the independent reviewer did in run 2 — the review changed the product:
 | Concurrency | 50 parallel bookings for one table across 4 processes → 1×201, 49×409 |
 | Mutation check | intact 1 winner · no transaction 1 · no unique index 1 · neither 4 — the race test can fail |
 | Test runtime | stage-1 ≈ 5 s, stage-2 ≈ 8 s (`npm test`) |
-| Run-2 review | independent reviewer: 1st verdict FAIL (4 defects) → fixed → re-verified; ~5 min, 26 tool calls for the first pass |
+| Run-2 review | independent reviewer, 4 rounds: FAIL (4 defects) → FAIL (1) → FAIL (2) → final; 7 defects found and fixed before ship. Round durations ≈ 5.4 / 1.8 / 4.2 min (26 / 12 / 21 tool calls) |
 | Clean container | fresh checkout → `docker build` (`npm ci`) → `docker run --network none`: UI, availability, booking, admin all 200/201; outbound request fails |
 | Runtime dependencies | 1 (express); SQLite and time zones are built into Node |
 | Model cost | not instrumented in these runs — token counts were not recorded, so we don't claim a number |

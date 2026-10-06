@@ -69,9 +69,11 @@ rule 4.
 **Voiceover:** "Run one's reviewer passed work it shouldn't have: its race
 test couldn't fail, and a 7:15 booking could overlap 7:00. An audit caught
 it. We fixed the code and fixed the mandates: the reviewer now has to prove
-every safety test can fail. In run two the reviewer is an independent agent,
-and its verdict is in the transcript. The mandates never mention
-restaurants. Swap the brief and they build something else."
+every safety test can fail. In run two the reviewer was an independent
+agent, and it failed the build three times: crashes on odd dates, a layout
+bug, and two of our own waitlist tests that couldn't fail. Seven defects
+were caught and fixed before ship, all in the transcript. The mandates never
+mention restaurants. Swap the brief and they build something else."
 
 ## Capture checklist
 - [ ] Shot 1: live Band Desktop room run (requires the desktop app + account)
