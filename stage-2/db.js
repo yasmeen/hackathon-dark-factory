@@ -1,4 +1,4 @@
-// Tablekeeper stage-1 — schema + seed data.
+// Tablekeeper — schema + seed data.
 // Run: node db.js   (creates ./data/tablekeeper.db from scratch)
 
 const { DatabaseSync } = require('node:sqlite');
@@ -44,11 +44,14 @@ function initSchema(db) {
       created_at TEXT NOT NULL
     );
     -- A table can hold at most one CONFIRMED reservation per slot.
-    -- This is the database-level backstop against double-booking.
+    -- This is the database-level backstop against double-booking. It only
+    -- works because the API accepts nothing but on-grid slot starts, so two
+    -- overlapping bookings always share the same slot_start_utc.
     CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_booking
       ON reservations(table_id, slot_start_utc) WHERE status = 'confirmed';
     CREATE TABLE IF NOT EXISTS idempotency_keys (
       key TEXT PRIMARY KEY,
+      request_hash TEXT NOT NULL DEFAULT '',
       reservation_id TEXT REFERENCES reservations(id),
       status_code INTEGER NOT NULL,
       response_body TEXT NOT NULL,
@@ -56,6 +59,7 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_reservations_lookup
       ON reservations(restaurant_id, slot_start_utc, status);
+    -- status: waiting -> booked (promoted onto a freed table) | left
     CREATE TABLE IF NOT EXISTS waitlist (
       id TEXT PRIMARY KEY,
       restaurant_id TEXT NOT NULL REFERENCES restaurants(id),
@@ -64,11 +68,23 @@ function initSchema(db) {
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'waiting',
+      reservation_id TEXT REFERENCES reservations(id),
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_waitlist_slot
       ON waitlist(restaurant_id, slot_start_utc, status, created_at);
+    -- one live waitlist entry per guest per slot
+    CREATE UNIQUE INDEX IF NOT EXISTS uniq_waiting_guest
+      ON waitlist(restaurant_id, slot_start_utc, phone) WHERE status = 'waiting';
   `);
+  addColumnIfMissing(db, 'idempotency_keys', 'request_hash', "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, 'waitlist', 'reservation_id', 'TEXT REFERENCES reservations(id)');
+}
+
+// Databases created by an earlier build lack newer columns; add them in place.
+function addColumnIfMissing(db, table, column, decl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
 }
 
 const SEED = [
@@ -104,7 +120,9 @@ function seed(db) {
 }
 
 if (require.main === module) {
-  try { fs.unlinkSync(DB_PATH); } catch {}
+  for (const suffix of ['', '-wal', '-shm']) {
+    try { fs.unlinkSync(DB_PATH + suffix); } catch {}
+  }
   const db = openDb();
   initSchema(db);
   seed(db);
@@ -112,4 +130,4 @@ if (require.main === module) {
   console.log('database initialized at', DB_PATH);
 }
 
-module.exports = { openDb, initSchema, seed };
+module.exports = { openDb, initSchema, seed, addColumnIfMissing };

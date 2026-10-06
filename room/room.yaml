@@ -7,8 +7,8 @@ room:
   name: "dark-factory-tablekeeper"
   created: "2026-10-01"
   purpose: >
-    Coordinate a band of coding-agent seats to ship a clean-room clone of a
-    restaurant reservation product. The dispatched task is the only human
+    Coordinate a band of coding-agent seats to ship the dispatched brief
+    (this run: room/brief.md). The dispatched task is the only human
     input; everything after is agent-to-agent.
 
 seats:
@@ -25,8 +25,10 @@ seats:
 protocol:
   - planner decomposes the brief into work items with observable done-states
   - planner dispatches items to implementer (parallel where unblocked)
-  - implementer hands off each item with changed files + verify commands
-  - reviewer verifies independently against done-states; PASS/FAIL with evidence
+  - implementer hands off each item to the planner with changed files + verify commands
+  - planner routes the handoff to the reviewer; work that was not dispatched is planned first
+  - reviewer verifies independently against done-states; PASS/FAIL with evidence;
+    every safety check must be shown to fail when its protection is removed
   - on FAIL, reviewer posts a defect report; implementer fixes; reviewer re-verifies
   - planner declares the run complete only when all items are verified
 
